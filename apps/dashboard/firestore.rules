@@ -1,0 +1,82 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helpers ──────────────────────────────────────────────────────────
+    function isAuth() {
+      return request.auth != null;
+    }
+    function role() {
+      return request.auth.token.get('role', 'viewer');
+    }
+    function isAdmin() {
+      return isAuth() && role() == 'admin';
+    }
+    function isOperator() {
+      return isAuth() && role() in ['admin', 'operador'];
+    }
+    function isViewer() {
+      return isAuth() && role() in ['admin', 'operador', 'viewer'];
+    }
+
+    // ── Usuarios del dashboard ────────────────────────────────────────────
+    match /usuarios/{uid} {
+      allow read: if isViewer();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ── Chats (solo lectura para viewers, escritura para operators) ────────
+    match /chats/{chatId} {
+      allow read: if isViewer();
+      allow write: if isOperator();
+
+      match /mensajes/{msgId} {
+        allow read: if isViewer();
+        // Operadores pueden marcar mensajes (ej: silenciar bot)
+        allow write: if isOperator();
+      }
+    }
+
+    // ── Clientes ──────────────────────────────────────────────────────────
+    match /clientes/{tel} {
+      allow read: if isViewer();
+      allow write: if isOperator();
+    }
+
+    // ── Config (prompts, general) ─────────────────────────────────────────
+    match /config/{docId} {
+      allow read: if isViewer();
+      allow write: if isOperator();
+
+      // Historial de versiones de prompts
+      match /versiones/{versionId} {
+        allow read: if isViewer();
+        allow write: if isOperator();
+      }
+    }
+
+    // ── Servicios (precios) ───────────────────────────────────────────────
+    match /servicios/{svcId} {
+      allow read: if isViewer();
+      allow write: if isOperator();
+    }
+
+    // ── Cola de leña ──────────────────────────────────────────────────────
+    match /colaLena/{pedidoId} {
+      allow read: if isViewer();
+      allow write: if isOperator();
+    }
+
+    // ── Log de mensajes (analytics) ───────────────────────────────────────
+    // Solo lectura para el dashboard; el bot escribe vía service account (admin SDK)
+    match /mensajes_log/{logId} {
+      allow read: if isViewer();
+      allow write: if false;
+    }
+
+    // ── Denegar todo lo demás ─────────────────────────────────────────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

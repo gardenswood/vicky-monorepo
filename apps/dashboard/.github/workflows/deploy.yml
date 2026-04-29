@@ -1,0 +1,53 @@
+name: Deploy Dashboard a Cloud Run
+
+on:
+  push:
+    branches: [master, main]
+  workflow_dispatch:  # Permite ejecutar manualmente desde GitHub
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Autenticar con Google Cloud (WIF / OIDC)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_WIF_SERVICE_ACCOUNT }}
+
+      - name: Setup gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: webgardens-8655d
+
+      - name: Build y Deploy a Cloud Run
+        run: |
+          echo "🚀 Iniciando deploy del dashboard..."
+          gcloud builds submit \
+            --config=cloudbuild.yaml \
+            --project=webgardens-8655d
+          echo "✅ Deploy completado"
+
+      - name: Verificar servicio
+        run: |
+          URL=$(gcloud run services describe vicky-dashboard \
+            --region=us-central1 \
+            --format='value(status.url)')
+          echo "🌐 Dashboard disponible en: $URL"
+          # Health check
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL/login")
+          echo "Health check /login → $STATUS"
+          if [ "$STATUS" != "200" ]; then
+            echo "❌ Health check falló (status: $STATUS)"
+            exit 1
+          fi
+          echo "✅ Servicio saludable"

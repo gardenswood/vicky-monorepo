@@ -1,0 +1,215 @@
+{
+  "lena": {
+    "id": "lena",
+    "nombre": "Lena",
+    "descripcion": "Lena de mezcla de quebracho blanco y colorado para hogar, salamandra y parrilla. Precio por tonelada de 1000 kg.",
+    "activo": true,
+    "tieneEnvio": true,
+    "marcador": "[IMG:lena]",
+    "infoEnvio": "Villa Allende: envio sin cargo desde 200 kg. Mendiolaza: envio sin cargo comprando 1 tonelada; para menos cantidad, flete de referencia $40.000. Unquillo, Rio Ceballos y zonas de distancia similar hasta 35 km: flete de referencia $50.000, con pedido minimo sugerido de 300 kg. Otras zonas: cotizar segun ubicacion exacta.",
+    "precios": [
+      {
+        "descripcion": "Hogar / Grande",
+        "precio": 290000,
+        "unidad": "tonelada"
+      },
+      {
+        "descripcion": "Salamandra / Mediana",
+        "precio": 300000,
+        "unidad": "tonelada"
+      },
+      {
+        "descripcion": "Parrilla / Fino (Quebracho Blanco)",
+        "precio": 320000,
+        "unidad": "tonelada"
+      }
+    ],
+    "notasOperacion": [
+      "No ofrecer carbon.",
+      "No ofrecer lena campana ni lena despunte salvo que el humano vuelva a activarlo desde el panel.",
+      "Toda la lena ofrecida actualmente es mezcla de quebracho blanco y colorado."
+    ]
+  },
+  "cerco": {
+    "id": "cerco",
+    "nombre": "Cercos de madera",
+    "descripcion": "Cercos con palos de eucalipto impregnado CCA. Material y mano de obra. Seña orientativa: $200.000 a $300.000. Saldo en efectivo al finalizar.",
+    "activo": true,
+    "tieneEnvio": false,
+    "marcador": "[IMG:cerco]",
+    "precios": [
+      {
+        "descripcion": "1.80 m de alto",
+        "precio": 140000,
+        "unidad": "metro lineal"
+      },
+      {
+        "descripcion": "2.00 m a 2.50 m de alto",
+        "precio": 170000,
+        "unidad": "metro lineal"
+      },
+      {
+        "descripcion": "Hasta 3.00 m de alto (medida especial)",
+        "precio": 185000,
+        "unidad": "metro lineal"
+      },
+      {
+        "descripcion": "Revestimiento con palo fino",
+        "precio": 150000,
+        "unidad": "metro lineal"
+      }
+    ],
+    "promocionActual": {
+      "estado": "activa_hasta_revision",
+      "texto": "Promocion Meta Ads: 30% de descuento en cercos de palos de eucalipto impregnado hasta el 30 de abril.",
+      "vigenteHasta": "2026-04-30",
+      "preciosPromocionales": [
+        {
+          "descripcion": "Cerco 1.80 m de alto",
+          "precio": 110000,
+          "unidad": "metro lineal"
+        },
+        {
+          "descripcion": "Cerco 2.00 m a 2.50 m de alto",
+          "precio": 140000,
+          "unidad": "metro lineal"
+        }
+      ],
+      "regla": "Durante la promocion, no mencionar el precio de lista salvo que el humano lo indique. Priorizar precio final promocional."
+    }
+  },
+  "pergola": {
+    "id": "pergola",
+    "nombre": "Pergolas",
+    "descripcion": "Material y mano de obra por metro cuadrado. Flete sin cargo en zonas cercanas a Villa Allende cuando aplique.",
+    "activo": true,
+    "tieneEnvio": false,
+    "marcador": "[IMG:pergola]",
+    "precios": [
+      {
+        "descripcion": "Cana Tacuara",
+        "precio": 110000,
+        "unidad": "m2"
+      },
+      {
+        "descripcion": "Cana Tacuara + Chapa Policarbonato",
+        "precio": 130000,
+        "unidad": "m2"
+      },
+      {
+        "descripcion": "Palos Pergoleros eucalipto CCA",
+        "precio": 130000,
+        "unidad": "m2"
+      },
+      {
+        "descripcion": "Palos Pergoleros + Policarbonato",
+        "precio": 150000,
+        "unidad": "m2"
+      }
+    ]
+  },
+  "fogonero": {
+    "id": "fogonero",
+    "nombre": "Sector Fogonero",
+    "descripcion": "Incluye geotextil y piedra blanca. Precio por metro cuadrado.",
+    "activo": true,
+    "tieneEnvio": false,
+    "marcador": "[IMG:fogonero]",
+    "precios": [
+      {
+        "descripcion": "Base con geotextil y piedra blanca",
+        "precio": 57000,
+        "unidad": "m2"
+      }
+    ]
+  },
+  "bancos": {
+    "id": "bancos",
+    "nombre": "Bancos de Quebracho Blanco",
+    "descripcion": "Banco de quebracho blanco macizo con respaldo. 60 cm de profundidad por largo deseado, maximo 2.70 m.",
+    "activo": true,
+    "tieneEnvio": false,
+    "marcador": "[IMG:bancos]",
+    "precios": [
+      {
+        "descripcion": "Banco con respaldo",
+        "precio": 355000,
+        "unidad": "metro lineal"
+      }
+    ]
+  },
+  "madera": {
+    "id": "madera",
+    "nombre": "Productos de madera",
+    "descripcion": "Venta por unidad o medida. Todos los precios son mas IVA. Retiro en local o envio a domicilio.",
+    "activo": true,
+    "tieneEnvio": true,
+    "marcador": "",
+    "infoEnvio": "Pedidos de 1 unidad en Villa Allende: $20.000. Otros casos se cotizan segun ubicacion y volumen.",
+    "precios": [
+      {
+        "descripcion": "Tabla QC 2,54 x 12,7 cm x 2 m",
+        "precio": 10574.85,
+        "unidad": "unidad"
+      },
+      {
+        "descripcion": "Tabla QC 2,54 x 12,7 cm x 2,7 m",
+        "precio": 14273.84,
+        "unidad": "unidad"
+      },
+      {
+        "descripcion": "Tabla QC 2,54 x 12,7 cm x 3 m",
+        "precio": 15859.52,
+        "unidad": "unidad"
+      },
+      {
+        "descripcion": "Poste eucalipto 7,5 m",
+        "precio": 101790,
+        "unidad": "unidad"
+      },
+      {
+        "descripcion": "Poste eucalipto 9 m",
+        "precio": 113100,
+        "unidad": "unidad"
+      },
+      {
+        "descripcion": "Tranquera 2 m",
+        "precio": 303875,
+        "unidad": "unidad"
+      },
+      {
+        "descripcion": "Tranquera 3 m",
+        "precio": 497250,
+        "unidad": "unidad"
+      },
+      {
+        "descripcion": "Mesa de jardin 2 m",
+        "precio": 511062.5,
+        "unidad": "unidad"
+      },
+      {
+        "descripcion": "Hamaca",
+        "precio": 635375,
+        "unidad": "unidad"
+      },
+      {
+        "descripcion": "Canizo criollo",
+        "precio": 14300,
+        "unidad": "m2"
+      },
+      {
+        "descripcion": "Canizo tacuara",
+        "precio": 11700,
+        "unidad": "m2"
+      },
+      {
+        "descripcion": "Costaneros",
+        "precio": 13812.5,
+        "unidad": "carga"
+      }
+    ],
+    "notasOperacion": [
+      "Lista resumida para no saturar el prompt. Conservar lista completa en dashboard/catalogo si se decide mostrar todo."
+    ]
+  }
+}

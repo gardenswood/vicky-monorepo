@@ -1,0 +1,39 @@
+{
+  "botActivo": true,
+  "modeloGemini": "gemini-3.1-flash-lite-preview",
+  "delayMinSeg": 26,
+  "delayMaxSeg": 34,
+  "frecuenciaAudioFidelizacion": 0,
+  "tiempoSilencioHumanoHoras": 24,
+  "horaAtencionDesde": "09:00",
+  "horaAtencionHasta": "18:00",
+  "adminPhone": "",
+  "whatsappAtencionCliente": "3515576639",
+  "whatsappLabelIdContactarAsesor": "",
+  "datosEntregaNotifyPhone": "5493512956376",
+  "whatsappGrupoJidAgendaEntregas": "https://chat.whatsapp.com/GPopHUhSNVJ9DLRHnVyGWH?mode=gi_t",
+  "notificarAgendaEntregasGrupoActivo": true,
+  "instagramDmActivo": false,
+  "instagramDmSoloEnlaceWhatsapp": true,
+  "instagramDmMensajeEnlaceWhatsapp": "Hola! Gracias por tu mensaje. Para una atencion mas personalizada, escribinos al WhatsApp de Gardens Wood: 3515576639.",
+  "geocodeCronActivo": true,
+  "geocodeCronMaxPorEjecucion": 30,
+  "campanaDelayMinSeg": 15,
+  "campanaDelayMaxSeg": 20,
+  "campanaMaxDestinatarios": 40,
+  "campanaDescuentoPct": 10,
+  "campanaRutaFechaTexto": "esta semana",
+  "campanaRutaPlantilla": "Hola {nombre}! Te escribo de Gardens Wood: {fechaTexto} tenemos novedades en *{zona}* sobre *{producto}*. Si queres mas info, respondeme este mensaje.",
+  "colaLenaCapacidadCamionKg": 1000,
+  "colaLenaUmbralDisparoRutaKg": 1000,
+  "propuesta": {
+    "origen": "firestore-audit 2026-04-29",
+    "estado": "pendiente_revision_humana",
+    "cambiosClave": [
+      "Se elimina lenguaje ajeno a Gardens Wood en plantilla de campana.",
+      "Se conserva el modelo Gemini y delays de produccion.",
+      "Se conservan telefonos y grupo operativo detectados en config/general.",
+      "Los campos de promociones temporales quedan fuera de este documento para evitar instrucciones vencidas."
+    ]
+  }
+}

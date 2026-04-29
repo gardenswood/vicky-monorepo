@@ -1,0 +1,19 @@
+services:
+  bot:
+    build:
+      context: ../../apps/bot
+    env_file:
+      - ../../apps/bot/.env
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+
+  dashboard:
+    build:
+      context: ../../apps/dashboard
+    env_file:
+      - ../../apps/dashboard/.env.local
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+

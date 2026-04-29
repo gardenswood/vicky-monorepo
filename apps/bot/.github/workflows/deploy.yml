@@ -1,0 +1,61 @@
+name: Deploy Bot Vicky a Cloud Run
+
+on:
+  push:
+    branches: [master, main]
+    paths:
+      - 'bot.js'
+      - 'vicky-gemini-turn.js'
+      - 'firestore-module.js'
+      - 'instagram-dm.js'
+      - 'kontrolpro-admin.js'
+      - 'package.json'
+      - 'Dockerfile'
+      - 'cloudbuild.yaml'
+      - '.github/workflows/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    name: Build & Deploy Bot
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Autenticar con Google Cloud (WIF / OIDC)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_WIF_SERVICE_ACCOUNT }}
+
+      - name: Setup gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: webgardens-8655d
+
+      - name: Build y Deploy via Cloud Build
+        run: |
+          echo "🤖 Iniciando deploy del bot via Cloud Build..."
+          gcloud builds submit \
+            --config=cloudbuild.yaml \
+            --project=webgardens-8655d
+          echo "✅ Bot desplegado"
+
+      - name: Verificar bot
+        run: |
+          URL=$(gcloud run services describe vicky-bot \
+            --region=us-central1 \
+            --format='value(status.url)')
+          echo "🤖 Bot URL: $URL"
+          # Con WIF no conviene `curl` autenticado desde el runner. Comprobamos Ready vía JSON.
+          READY=$(gcloud run services describe vicky-bot --region=us-central1 --format=json \
+            | python3 -c "import json,sys; d=json.load(sys.stdin); print(next(c['status'] for c in d['status']['conditions'] if c['type']=='Ready'))")
+          echo "Cloud Run Ready: $READY"
+          test "$READY" = "True"
+          echo "✅ Servicio vicky-bot Ready en us-central1"

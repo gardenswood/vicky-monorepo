@@ -1,0 +1,66 @@
+{
+  "promociones": [
+    {
+      "id": "promo_cercos_30_off_abril_2026",
+      "servicioId": "cerco",
+      "titulo": "30% off en cercos de eucalipto impregnado",
+      "estado": "activa_hasta_revision",
+      "desde": "2026-04-07",
+      "hasta": "2026-04-30",
+      "canalOrigen": "whatsapp_admin_meta_ads",
+      "textoParaVicky": "Hasta el 30 de abril tenemos 30% de descuento en cercos de palos de eucalipto impregnado.",
+      "reglas": [
+        "Priorizar precio final promocional durante la campana.",
+        "No mencionar precio de lista salvo que el humano lo indique.",
+        "Pedir metros lineales, altura, zona y si necesita medicion."
+      ],
+      "preciosPromocionales": [
+        {
+          "descripcion": "Cerco 1.80 m de alto",
+          "precio": 110000,
+          "unidad": "metro lineal"
+        },
+        {
+          "descripcion": "Cerco 2.00 m a 2.50 m de alto",
+          "precio": 140000,
+          "unidad": "metro lineal"
+        }
+      ]
+    },
+    {
+      "id": "promo_lena_1tn_envio_sin_cargo_revisar",
+      "servicioId": "lena",
+      "titulo": "Envio sin cargo por 1 tonelada de lena",
+      "estado": "requiere_confirmacion_humana",
+      "desde": "2026-04-13",
+      "hasta": null,
+      "canalOrigen": "whatsapp_admin",
+      "textoParaVicky": "Promocion detectada por WhatsApp: 1 tonelada de lena con envio sin cargo a toda Cordoba.",
+      "reglas": [
+        "No activar automaticamente porque las instrucciones originales decian 'hoy'.",
+        "Confirmar vigencia antes de subir a Firestore.",
+        "Si se activa, definir fecha de vencimiento y zonas cubiertas."
+      ]
+    }
+  ],
+  "restricciones": [
+    {
+      "id": "no_ofrecer_carbon",
+      "estado": "vigente",
+      "textoParaVicky": "No ofrecer carbon. Gardens Wood no vende carbon en este flujo."
+    },
+    {
+      "id": "no_datos_bancarios",
+      "estado": "vigente",
+      "textoParaVicky": "No pasar alias, CBU, cuentas bancarias ni datos de transferencia. Derivar cierre de pago a asesor."
+    },
+    {
+      "id": "no_contactar_numero_3517059149",
+      "estado": "vigente",
+      "tipo": "bloqueo_contacto",
+      "telefono": "3517059149",
+      "textoParaOperacion": "No enviar mensajes a este numero salvo confirmacion humana explicita."
+    }
+  ],
+  "notaTecnica": "Este documento es una propuesta. El bot actual no lee config/promociones automaticamente; para usarlo en produccion hay que implementar lectura en el bot o consolidar promociones vigentes en config/prompts y servicios."
+}
