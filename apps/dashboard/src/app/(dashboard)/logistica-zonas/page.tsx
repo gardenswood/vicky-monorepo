@@ -91,6 +91,15 @@ function telFromJid(jid: string): string {
   return jid.replace('@s.whatsapp.net', '').replace('@g.us', '')
 }
 
+function normalizeZonaKey(zona: string): string {
+  return (zona || 'Sin zona')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .replace(/\s+/g, ' ')
+}
+
 function toDate(value: unknown): Date {
   if (value instanceof Timestamp) return value.toDate()
   if (value && typeof value === 'object' && 'toDate' in value && typeof value.toDate === 'function') {
@@ -203,17 +212,20 @@ export default function LogisticaZonasPage() {
   }, [])
 
   const zonas = useMemo<ZonaSummary[]>(() => {
-    const buckets = new Map<string, ConsultaLena[]>()
+    const buckets = new Map<string, { label: string; items: ConsultaLena[] }>()
     consultas.forEach((consulta) => {
       const zona = consulta.zona.trim() || 'Sin zona'
-      buckets.set(zona, [...(buckets.get(zona) ?? []), consulta])
+      const key = normalizeZonaKey(zona)
+      const current = buckets.get(key)
+      if (current) current.items.push(consulta)
+      else buckets.set(key, { label: zona, items: [consulta] })
     })
 
-    return [...buckets.entries()]
-      .map(([zona, items]) => {
+    return [...buckets.values()]
+      .map(({ label, items }) => {
         const totalKg = items.reduce((sum, item) => sum + item.cantidadKg, 0)
         return {
-          zona,
+          zona: label,
           totalKg,
           cantidadConsultas: items.length,
           consultas: items.sort((a, b) => a.fechaConsulta.getTime() - b.fechaConsulta.getTime()),

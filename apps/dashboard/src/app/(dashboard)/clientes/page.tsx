@@ -58,6 +58,25 @@ const SERVICIOS = ['todos', 'lena', 'cerco', 'pergola', 'fogonero', 'bancos', 'm
 const POTENCIALES = ['todos', 'frio', 'tibio', 'caliente']
 const STATUS_CRM = ['todos', 'pendiente_cotizacion', 'seguimiento', 'concreto', 'en_obra']
 
+function normalizePotencial(value?: string): string {
+  return (value ?? '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+}
+
+function optionalDate(value: unknown): Date | undefined {
+  if (!value) return undefined
+  if (value instanceof Date) return value
+  if (typeof value === 'object' && 'toDate' in value && typeof value.toDate === 'function') return value.toDate()
+  if (typeof value === 'string' || typeof value === 'number') {
+    const date = new Date(value)
+    return Number.isFinite(date.getTime()) ? date : undefined
+  }
+  return undefined
+}
+
 export default function ClientesPage() {
   const [clientes, setClientes] = useState<Cliente[]>([])
   const [filtered, setFiltered] = useState<Cliente[]>([])
@@ -67,6 +86,7 @@ export default function ClientesPage() {
   const [potencialFilter, setPotencialFilter] = useState('todos')
   const [statusCrmFilter, setStatusCrmFilter] = useState('todos')
   const [soloLenaActiva, setSoloLenaActiva] = useState(false)
+  const [soloVencidos, setSoloVencidos] = useState(false)
   const [consultasLena, setConsultasLena] = useState<ConsultaLenaActiva[]>([])
   const [quickTel, setQuickTel] = useState<string | null>(null)
   const [quickForm, setQuickForm] = useState({ cantidadKg: '', zona: '', notas: '' })
@@ -87,13 +107,13 @@ export default function ClientesPage() {
           estado: d.estado,
           servicioPendiente: d.servicioPendiente,
           pedidosAnteriores: d.pedidosAnteriores || [],
-          fechaUltimoContacto: d.fechaUltimoContacto?.toDate(),
-          fechaPrimerContacto: d.fechaPrimerContacto?.toDate(),
+          fechaUltimoContacto: optionalDate(d.fechaUltimoContacto),
+          fechaPrimerContacto: optionalDate(d.fechaPrimerContacto),
           potencial: d.potencial,
           statusCrm: d.statusCrm,
           urgencia: d.urgencia,
           interes: Array.isArray(d.interes) ? d.interes : [],
-          proximoContactoAt: d.proximoContactoAt?.toDate(),
+          proximoContactoAt: optionalDate(d.proximoContactoAt),
         }
       })
       setClientes(data)
@@ -148,6 +168,17 @@ export default function ClientesPage() {
     (c) => c.interes?.some((i) => i.toLowerCase().includes('lena') || i.toLowerCase().includes('leña')) && c.estado !== 'confirmado'
   ).length
 
+  function leadPriority(cliente: Cliente): number {
+    const potencial = normalizePotencial(cliente.potencial)
+    let score = 0
+    if (cliente.proximoContactoAt && cliente.proximoContactoAt < todayStart) score += 100
+    if (cliente.statusCrm === 'seguimiento') score += 30
+    if (potencial === 'caliente') score += 25
+    if (cliente.urgencia === 'alta') score += 20
+    if (cliente.estado === 'cotizacion_enviada') score += 10
+    return score
+  }
+
   useEffect(() => {
     let result = [...clientes]
     if (search) {
@@ -162,16 +193,23 @@ export default function ClientesPage() {
     }
     if (estadoFilter !== 'todos') result = result.filter((c) => c.estado === estadoFilter)
     if (servicioFilter !== 'todos') result = result.filter((c) => c.servicioPendiente === servicioFilter)
-    if (potencialFilter !== 'todos') result = result.filter((c) => c.potencial === potencialFilter)
+    if (potencialFilter !== 'todos') result = result.filter((c) => normalizePotencial(c.potencial) === potencialFilter)
     if (statusCrmFilter !== 'todos') result = result.filter((c) => c.statusCrm === statusCrmFilter)
     if (soloLenaActiva) result = result.filter((c) => (consultasByTel.get(c.tel)?.length ?? 0) > 0)
+    if (soloVencidos) result = result.filter((c) => !!c.proximoContactoAt && c.proximoContactoAt < todayStart)
+    result.sort((a, b) => {
+      const priorityDiff = leadPriority(b) - leadPriority(a)
+      if (priorityDiff !== 0) return priorityDiff
+      return (b.fechaUltimoContacto?.getTime() ?? 0) - (a.fechaUltimoContacto?.getTime() ?? 0)
+    })
     setFiltered(result)
-  }, [clientes, search, estadoFilter, servicioFilter, potencialFilter, statusCrmFilter, soloLenaActiva, consultasByTel])
+  }, [clientes, search, estadoFilter, servicioFilter, potencialFilter, statusCrmFilter, soloLenaActiva, soloVencidos, consultasByTel, todayStart])
 
   function potencialClass(potencial?: string) {
-    if (potencial === 'frio') return 'bg-sky-50 text-sky-700'
-    if (potencial === 'tibio') return 'bg-yellow-50 text-yellow-700'
-    if (potencial === 'caliente') return 'bg-orange-100 text-orange-700'
+    const normalized = normalizePotencial(potencial)
+    if (normalized === 'frio') return 'bg-sky-50 text-sky-700'
+    if (normalized === 'tibio') return 'bg-yellow-50 text-yellow-700'
+    if (normalized === 'caliente') return 'bg-orange-100 text-orange-700'
     return 'bg-slate-100 text-slate-600'
   }
 
@@ -308,6 +346,18 @@ export default function ClientesPage() {
             ))}
           </select>
         </div>
+        <button
+          type="button"
+          onClick={() => setSoloVencidos((v) => !v)}
+          className={cn(
+            'badge px-3 py-2 border transition-colors',
+            soloVencidos
+              ? 'bg-red-100 text-red-800 border-red-200'
+              : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+          )}
+        >
+          Tareas vencidas ({seguimientosVencidos})
+        </button>
         <button
           type="button"
           onClick={() => setSoloLenaActiva((v) => !v)}

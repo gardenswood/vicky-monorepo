@@ -54,9 +54,10 @@ ID de documento: dígitos de línea WhatsApp (sin `@s.whatsapp.net`) **o** `ig:{
 |---------------------|------|-----------------|
 | `telefono` | string (opcional) | Dígitos de la línea (suele coincidir con el id del doc cuando el chat es `@lid` mapeado). |
 | `whatsappLid` | string (opcional) | Identificador LID sin `@lid`; enlaza la ficha `clientes/{tel}` con el hilo real del cliente. |
-| `potencial` | string | `frío`, `tibio`, `caliente` |
+| `potencial` | string | `frio`, `tibio`, `caliente` |
 | `statusCrm` | string | `pendiente_cotizacion`, `seguimiento`, `concreto`, `en_obra` |
 | `urgencia` | string | `alta`, `media`, `baja` |
+| `proximoContactoAt` | Timestamp | Próxima tarea de seguimiento; el bot la crea al cotizar, agendar o detectar intención fuerte. |
 | `zona` | string | Texto libre; filtro campaña `#RUTA` |
 | `interes` | array of string | ej. `pergolas`, `cercos`, `lena`, `mantenimiento`; `#RUTA` puede matchear servicio también por este array |
 | `tipoLenaPreferido` | string (opcional) | `hogar`, `salamandra` o `parrilla`; el panel y filtros de logística; el bot puede actualizarlo al registrar `[PEDIDO_LENA:…\|tipo]` |

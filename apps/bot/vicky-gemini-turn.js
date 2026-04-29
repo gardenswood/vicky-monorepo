@@ -46,6 +46,55 @@ function elegirFraseFallbackAudioCortoAcuse(session, primerNombre) {
     return usar[Math.floor(Math.random() * usar.length)];
 }
 
+function fechaSeguimientoDesdeAhora(horas) {
+    const d = new Date();
+    d.setHours(d.getHours() + horas);
+    return d;
+}
+
+function fechaFirestoreCrm(value) {
+    if (!value) return null;
+    if (value instanceof Date) return Number.isFinite(value.getTime()) ? value : null;
+    const ms = Date.parse(String(value));
+    return Number.isFinite(ms) ? new Date(ms) : null;
+}
+
+function normalizarPotencialCrm(value) {
+    const v = String(value || '')
+        .trim()
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/\p{M}/gu, '');
+    return v === 'frio' || v === 'tibio' || v === 'caliente' ? v : '';
+}
+
+function normalizarInteresesCrm(value) {
+    const items = Array.isArray(value) ? value : String(value || '').split(',');
+    return [...new Set(items
+        .map((x) => String(x || '').trim().toLowerCase().normalize('NFD').replace(/\p{M}/gu, ''))
+        .filter(Boolean))];
+}
+
+function crmAutoPorLeadStage(stage) {
+    if (stage === 'interesado') {
+        return {
+            potencial: 'caliente',
+            statusCrm: 'seguimiento',
+            urgencia: 'alta',
+            proximoContactoAt: fechaSeguimientoDesdeAhora(24),
+        };
+    }
+    if (stage === 'curioso') {
+        return {
+            potencial: 'frio',
+            statusCrm: 'pendiente_cotizacion',
+            urgencia: 'baja',
+            proximoContactoAt: fechaSeguimientoDesdeAhora(72),
+        };
+    }
+    return {};
+}
+
 /**
  * Núcleo compartido: Gemini + marcadores + historial (WhatsApp e Instagram DM).
  * @param {object} deps - dependencias inyectadas desde bot.js
@@ -294,7 +343,7 @@ async function ejecutarTurnoVickyGeminiCore(deps, params) {
         else if (pidePrecio && !tieneMedidasOCantidad) leadStage = 'curioso';
 
         if (leadStage) {
-            actualizarEstadoCliente(remoteJid, { leadStage });
+            actualizarEstadoCliente(remoteJid, { leadStage, ...crmAutoPorLeadStage(leadStage) });
         }
 
         const ctxLead =
@@ -377,6 +426,10 @@ async function ejecutarTurnoVickyGeminiCore(deps, params) {
             actualizarEstadoCliente(remoteJid, {
                 estado: 'cotizacion_enviada',
                 servicioPendiente: srv,
+                potencial: 'caliente',
+                statusCrm: 'seguimiento',
+                urgencia: 'alta',
+                proximoContactoAt: fechaSeguimientoDesdeAhora(24),
                 textoCotizacion: text,
                 fechaCotizacion: new Date().toISOString(),
                 seguimientoEnviado: false,
@@ -432,7 +485,13 @@ async function ejecutarTurnoVickyGeminiCore(deps, params) {
         if (/\[CONFIRMADO\]/i.test(respuesta)) {
             huboConfirmadoMarcador = true;
             respuesta = respuesta.replace(/\[CONFIRMADO\]/gi, '').trim();
-            actualizarEstadoCliente(remoteJid, { estado: 'confirmado' });
+            actualizarEstadoCliente(remoteJid, {
+                estado: 'confirmado',
+                potencial: 'caliente',
+                statusCrm: 'concreto',
+                urgencia: 'alta',
+                proximoContactoAt: fechaSeguimientoDesdeAhora(6),
+            });
             console.log(`✅ Cliente ${remoteJid} confirmó.`);
         }
 
@@ -568,18 +627,17 @@ async function ejecutarTurnoVickyGeminiCore(deps, params) {
         const crmMatch = respuesta.match(/\[CRM:([^\]]+)\]/i);
         if (crmMatch) {
             const p = crmMatch[1].split('|').map((x) => x.trim());
-            const potRaw = (p[0] || '').toLowerCase();
-            const pot = potRaw === 'frio' ? 'frío' : potRaw;
+            const pot = normalizarPotencialCrm(p[0]);
             const st = (p[1] || '').toLowerCase();
             const urg = (p[2] || '').toLowerCase();
             const zonaCrm = p[3] || '';
             const interCsv = p[4] || '';
             const upd = {};
-            if (['frío', 'tibio', 'caliente'].includes(pot)) upd.potencial = pot;
+            if (pot) upd.potencial = pot;
             if (['pendiente_cotizacion', 'seguimiento', 'concreto', 'en_obra'].includes(st)) upd.statusCrm = st;
             if (['alta', 'media', 'baja'].includes(urg)) upd.urgencia = urg;
             if (zonaCrm) upd.zona = zonaCrm;
-            if (interCsv) upd.interes = interCsv.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+            if (interCsv) upd.interes = normalizarInteresesCrm(interCsv);
             if (Object.keys(upd).length) actualizarEstadoCliente(remoteJid, upd);
             respuesta = respuesta.replace(/\[CRM:[^\]]+\]/gi, '').trim();
         }
@@ -614,6 +672,10 @@ async function ejecutarTurnoVickyGeminiCore(deps, params) {
                     texto: txtAg,
                     runAtMs: runMs,
                     origen: 'gemini_agendar',
+                });
+                actualizarEstadoCliente(remoteJid, {
+                    statusCrm: 'seguimiento',
+                    proximoContactoAt: new Date(runMs),
                 });
             }
             respuesta = respuesta.replace(/\[AGENDAR:[^\]]+\]/gi, '').trim();
@@ -810,6 +872,7 @@ async function ejecutarTurnoVickyGeminiCore(deps, params) {
                     potencial: clienteSync.potencial || null,
                     statusCrm: clienteSync.statusCrm || null,
                     urgencia: clienteSync.urgencia || null,
+                    proximoContactoAt: fechaFirestoreCrm(clienteSync.proximoContactoAt),
                     interes: Array.isArray(clienteSync.interes) ? clienteSync.interes : [],
                     origenAnuncio: clienteSync.origenAnuncio || null,
                     pedidosAnteriores: clienteSync.pedidosAnteriores || [],

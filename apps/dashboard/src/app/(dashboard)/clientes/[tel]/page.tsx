@@ -44,6 +44,22 @@ interface ConsultaLenaActiva {
   notas?: string
 }
 
+function optionalDate(value: unknown): Date | undefined {
+  if (!value) return undefined
+  if (value instanceof Date) return value
+  if (typeof value === 'object' && 'toDate' in value && typeof value.toDate === 'function') return value.toDate()
+  if (typeof value === 'string' || typeof value === 'number') {
+    const date = new Date(value)
+    return Number.isFinite(date.getTime()) ? date : undefined
+  }
+  return undefined
+}
+
+function normalizePotencial(value?: string): string | undefined {
+  const normalized = (value ?? '').trim().toLowerCase().normalize('NFD').replace(/\p{M}/gu, '')
+  return normalized || undefined
+}
+
 export default function ClienteDetailPage() {
   const { tel } = useParams<{ tel: string }>()
   const router = useRouter()
@@ -76,15 +92,15 @@ export default function ClienteDetailPage() {
             ...p,
             fecha: (p.fecha as { toDate?: () => Date })?.toDate?.(),
           })),
-          fechaUltimoContacto: d.fechaUltimoContacto?.toDate(),
-          fechaPrimerContacto: d.fechaPrimerContacto?.toDate(),
+          fechaUltimoContacto: optionalDate(d.fechaUltimoContacto),
+          fechaPrimerContacto: optionalDate(d.fechaPrimerContacto),
           notas: d.notas,
           audioIntroEnviado: d.audioIntroEnviado,
-          potencial: d.potencial,
+          potencial: normalizePotencial(d.potencial),
           statusCrm: d.statusCrm,
           urgencia: d.urgencia,
           interes: Array.isArray(d.interes) ? d.interes : [],
-          proximoContactoAt: d.proximoContactoAt?.toDate(),
+          proximoContactoAt: optionalDate(d.proximoContactoAt),
           consentimientoDifusion: d.consentimientoDifusion,
         }
         setCliente(c)

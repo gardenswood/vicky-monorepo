@@ -17,6 +17,7 @@ Usar las funciones operativas del dashboard como herramientas de gestión comerc
 - Fuente: `clientes/{tel}`.
 - Usos: nombre, zona, dirección, intereses, urgencia, potencial, estado CRM, servicio pendiente y próximo contacto.
 - Acción: completar datos con marcadores CRM cuando el cliente los da naturalmente.
+- Regla operativa: el dashboard **CRM Ventas** prioriza tareas vencidas, leads calientes, seguimientos y cotizaciones. Vicky debe dejar `proximoContactoAt` cuando haya que volver a escribir.
 
 ### Agenda de entregas
 
@@ -36,6 +37,7 @@ Usar las funciones operativas del dashboard como herramientas de gestión comerc
 - Fuente operativa del bot: GCS/RAM; espejo dashboard: `colaLena/{id}`.
 - Usos: pedidos de leña confirmados listos para despacho.
 - Acción: no editar la cola desde consultas pendientes; pasar por el flujo confirmado.
+- Reparto: el bot puede disparar ruta por camión completo o por grupo de zona/corredor que alcance el umbral configurado, sin arrastrar pedidos de otros corredores que todavía no convienen.
 
 ### Consultas de leña por zona
 

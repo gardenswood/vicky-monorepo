@@ -772,7 +772,7 @@ REGLAS DE COMPORTAMIENTO
 
 MARCADORES INTERNOS (no visibles para el cliente; van al final del pensamiento de respuesta o en línea aparte):
 • [DIRECCION:…] [ZONA:…] [BARRIO:…] [LOCALIDAD:…] [REFERENCIA:…] [NOTAS_UBICACION:…] — guardan ficha en CRM/mapas (reglas 19–20b).
-• [CRM:potencial|statusCrm|urgencia|zona|intereses] — potencial: frío|tibio|caliente · statusCrm: pendiente_cotizacion|seguimiento|concreto|en_obra · urgencia: alta|media|baja · zona: barrio/zona libre · intereses: lista separada por comas (pergolas,decks,cercos,lena,mantenimiento). Ej: [CRM:tibio|seguimiento|media|Villa Allende|cercos,lena]
+• [CRM:potencial|statusCrm|urgencia|zona|intereses] — potencial: frio|tibio|caliente · statusCrm: pendiente_cotizacion|seguimiento|concreto|en_obra · urgencia: alta|media|baja · zona: barrio/zona libre · intereses: lista separada por comas (pergolas,decks,cercos,lena,mantenimiento). Ej: [CRM:tibio|seguimiento|media|Villa Allende|cercos,lena]. Si hay cotización o intención fuerte, el sistema además crea una próxima tarea de seguimiento para que no se escape el lead.
 • [NOTIFICAR_VENTA:resumen breve del pedido o intención de compra] — cuando el cliente pide datos bancarios/CBU, confirma pedido fuerte o muestra intención de cierre. NO le pases CBU, alias ni datos de transferencia vos: decile que en breve un asesor se comunica con los datos. Incluí despedida tipo "en breve un asesor te contacta".
 • [AGENDAR:YYYY-MM-DD|texto del recordatorio] — si el cliente pide que lo contacten otro día (ej. "escribime el lunes"). Una línea; fecha ISO y texto corto para el mensaje programado.
 • [ENTREGA:YYYY-MM-DD|HH:mm o --|título breve] — cuando coordinás fecha (y si aplica hora) de entrega u obra: queda en el **calendario del panel** (Agenda de entregas). Usá \`--\` (dos guiones) en hora si es solo el día. Ej: [ENTREGA:2026-04-07|09:00|1 tn leña Iván] o [ENTREGA:2026-04-07|--|Entrega leña coordinada].
@@ -2101,6 +2101,50 @@ function debeDispararRutaColaLena(totalKg, pedidosEnCola, cfg) {
     return { disparar: false, motivo: '' };
 }
 
+function totalKgPedidosCola(pedidos) {
+    return (Array.isArray(pedidos) ? pedidos : []).reduce((sum, p) => sum + (Number(p?.cantidadKg) || 0), 0);
+}
+
+function seleccionarPedidosRutaColaLena(pedidosEnCola, cfg) {
+    const pedidos = (Array.isArray(pedidosEnCola) ? pedidosEnCola : [])
+        .filter((p) => p && p.estado === 'en_cola');
+    const total = totalKgPedidosCola(pedidos);
+    if (total <= 0 || pedidos.length === 0) return { disparar: false, motivo: '', pedidos: [], totalKg: total };
+    if (total >= cfg.umbralDisparoRutaKg) {
+        return { disparar: true, motivo: 'umbral_camion', pedidos, totalKg: total };
+    }
+
+    const ucz = cfg.umbralClusterZonaKg;
+    if (!(ucz != null && Number.isFinite(ucz) && ucz >= 100 && ucz < cfg.umbralDisparoRutaKg)) {
+        return { disparar: false, motivo: '', pedidos: [], totalKg: total };
+    }
+
+    const grupos = [];
+    for (const pedido of pedidos) {
+        const token = tokenZonaClusterCola(pedido);
+        if (!token) continue;
+        let grupo = grupos.find((g) => tokensMismoCorredorCola(g.token, token, cfg.clusterZonaMinPrefijo));
+        if (!grupo) {
+            grupo = { token, pedidos: [] };
+            grupos.push(grupo);
+        }
+        grupo.pedidos.push(pedido);
+    }
+
+    const candidatos = grupos
+        .map((g) => ({ ...g, totalKg: totalKgPedidosCola(g.pedidos) }))
+        .filter((g) => g.pedidos.length >= 2 && g.totalKg >= ucz)
+        .sort((a, b) => b.totalKg - a.totalKg);
+
+    if (candidatos.length === 0) return { disparar: false, motivo: '', pedidos: [], totalKg: total };
+    return {
+        disparar: true,
+        motivo: 'umbral_zona_cercana',
+        pedidos: candidatos[0].pedidos,
+        totalKg: candidatos[0].totalKg,
+    };
+}
+
 /**
  * Umbrales y textos de cola (merge con `config/general` vía Firestore).
  * `colaLenaUmbralClusterZonaKg`: 0 o ausente inválido → null (solo umbral principal).
@@ -2469,15 +2513,17 @@ async function agregarAColaLena(remoteJid, nombre, direccion, zona, cantidadKg, 
     const cfgCola = await obtenerConfigColaLena();
     const totalActual = totalKgEnCola();
     const pedidosPendientes = colaLena.filter(p => p.estado === 'en_cola');
-    const { disparar, motivo } = debeDispararRutaColaLena(totalActual, pedidosPendientes, cfgCola);
+    const seleccionRuta = seleccionarPedidosRutaColaLena(pedidosPendientes, cfgCola);
+    const { disparar, motivo } = seleccionRuta;
     const extraZona = cfgCola.umbralClusterZonaKg != null
         ? ` · zona cercana ≥${cfgCola.umbralClusterZonaKg}kg si el corredor coincide`
         : '';
     console.log(`🪵 Total en cola: ${totalActual}kg (camión ref. ${cfgCola.capacidadCamionKg}kg · disparo ${cfgCola.umbralDisparoRutaKg}kg${extraZona})`);
 
     if (disparar) {
-        console.log(`🚚 Ruta (${motivo}): ${totalActual}kg. Optimizando orden de visitas…`);
-        const enriquecidos = await enriquecerPedidosColaConCoordenadasCRM(pedidosPendientes);
+        console.log(`🚚 Ruta (${motivo}): ${seleccionRuta.totalKg}kg de ${totalActual}kg en cola. Optimizando orden de visitas…`);
+        const pedidosParaRuta = seleccionRuta.pedidos.length ? seleccionRuta.pedidos : pedidosPendientes;
+        const enriquecidos = await enriquecerPedidosColaConCoordenadasCRM(pedidosParaRuta);
         const metaRuta = { metrosTotales: /** @type {number | null} */ (null) };
         const pedidosOrdenados = await optimizarRutaEntregasColaLeña(enriquecidos, metaRuta);
         const rutaGrupoId = `rg_${Date.now()}`;
@@ -2503,7 +2549,10 @@ async function agregarAColaLena(remoteJid, nombre, direccion, zona, cantidadKg, 
             };
         });
 
-        pedidosPendientes.forEach(p => { p.estado = 'notificado'; });
+        const telsRuta = new Set(pedidosParaRuta.map((p) => getTel(p.remoteJid)).filter(Boolean));
+        pedidosPendientes.forEach((p) => {
+            if (telsRuta.has(getTel(p.remoteJid))) p.estado = 'notificado';
+        });
         await saveColaLenaGCS();
 
         await notificarAdminRutaLeñaConCopia(paraMensajeAdmin, metaRuta.metrosTotales, motivo, cfgCola);
@@ -3295,6 +3344,7 @@ async function syncClienteFirestoreDesdeHistorialLocal(jid) {
             potencial: clienteSync.potencial || null,
             statusCrm: clienteSync.statusCrm || null,
             urgencia: clienteSync.urgencia || null,
+            proximoContactoAt: fechaFirestoreCrm(clienteSync.proximoContactoAt),
             interes: Array.isArray(clienteSync.interes) ? clienteSync.interes : [],
             origenAnuncio: clienteSync.origenAnuncio || null,
             pedidosAnteriores: clienteSync.pedidosAnteriores || [],
@@ -4315,6 +4365,13 @@ function docIdClienteFirestore(remoteJid, cliente) {
     const d = soloDigitosTel(linea);
     if (d.length >= 8) return d;
     return getTel(remoteJid);
+}
+
+function fechaFirestoreCrm(value) {
+    if (!value) return null;
+    if (value instanceof Date) return Number.isFinite(value.getTime()) ? value : null;
+    const ms = Date.parse(String(value));
+    return Number.isFinite(ms) ? new Date(ms) : null;
 }
 
 function asegurarCliente(remoteJid) {
