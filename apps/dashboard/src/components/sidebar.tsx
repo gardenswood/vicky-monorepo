@@ -34,7 +34,7 @@ const navItems = [
     icon: MessageSquare,
   },
   {
-    label: 'Clientes',
+    label: 'CRM Ventas',
     href: '/clientes',
     icon: Users,
   },

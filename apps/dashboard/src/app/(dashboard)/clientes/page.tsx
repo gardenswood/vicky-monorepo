@@ -236,9 +236,9 @@ export default function ClientesPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Clientes</h1>
+          <h1 className="text-2xl font-bold text-slate-900">CRM Ventas</h1>
           <p className="text-slate-500 text-sm mt-0.5">
-            {clientes.length} clientes registrados · {clientes.filter((c) => c.estado === 'cliente').length} recurrentes
+            Cerebro comercial de Vicky: atenciones, leads, seguimientos, intereses y remarketing. {clientes.length} contactos registrados - {clientes.filter((c) => c.estado === 'cliente').length} clientes recurrentes
           </p>
         </div>
         <button onClick={exportCSV} className="btn-secondary flex items-center gap-1.5">

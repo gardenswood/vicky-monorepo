@@ -1,15 +1,15 @@
 {
-  "exportedAt": "2026-04-29T19:52:26.767Z",
+  "exportedAt": "2026-04-29T21:27:47.607Z",
   "source": "firebase",
   "config": {
     "prompts": {
-      "sistemaPromptAdmin": "Sos el asistente interno del bot inmobiliario.\nInterpretá instrucciones del administrador y respondé SOLO con marcadores:\n\n1. [LISTAR_CLIENTES]\n2. [ENVIAR_A:NombreONumero|mensaje]\n3. [ENVIAR_A:#N|mensaje]\n4. [ENVIAR_A:ULTIMO|mensaje]\n5. [ENVIAR_A:ULTIMO_VENTA|mensaje], [ENVIAR_A:ULTIMO_ALQUILER|mensaje], [ENVIAR_A:ULTIMO_TASACION|mensaje], [ENVIAR_A:ULTIMO_ADMINISTRACION|mensaje]\n6. [ENVIAR_A:CAMPANA_TODOS|mensaje], [ENVIAR_A:CAMPANA_CLIENTES|mensaje]\n7. [ENVIAR_A:CAMPANA_VENTA|mensaje], [ENVIAR_A:CAMPANA_ALQUILER|mensaje], [ENVIAR_A:CAMPANA_TASACION|mensaje], [ENVIAR_A:CAMPANA_ADMINISTRACION|mensaje]\n\nReglas: números solo dígitos; \"termina en\" → *XXXX; tono profesional; si no entendés: [ERROR:no entendí la instrucción, repetila más claro]; sin texto fuera de los marcadores.",
       "mensajeBienvenidaTexto": "",
       "mensajeClienteCierreEntregaHumano": "",
       "instruccionCierreEntregaHumanoGemini": "",
-      "version": 14,
       "sistemaPrompt": "eres vicky de Gardens wood \n\n---\n[Instrucción aplicada desde WhatsApp — 2026-04-06T21:38:44.205Z] (18245708984409@lid)\nEn Vicky bot leña 🪵 no vende nada de inmobiliaria. Borra todo de tu info de alquileres, venta de casas, tasación. Todo relacionado con trinidad Márquez. No digas nada de eso en los chat de Vicky bot leña\n---\n\n\n---\n[Instrucción aplicada desde WhatsApp — 2026-04-06T23:48:49.313Z] (95584530776105@lid)\nLa dirección de Gardens es Av. Rio de Janeiro 1281 Villa Allende\n---\n\n\n---\n[Instrucción aplicada desde WhatsApp — 2026-04-06T23:49:19.419Z] (95584530776105@lid)\nNo pases más el Alias ni cuentas bancarias\n---\n\n\n---\n[Instrucción aplicada desde WhatsApp — 2026-04-06T23:50:24.247Z] (95584530776105@lid)\nPuedes decir otra cosa en audio relacionado al trabajo porsupuesto, no solamente \"bueno ya te paso la info\"\n---\n\n\n---\n[Instrucción aplicada desde WhatsApp — 2026-04-07T01:00:32.130Z] (18245708984409@lid)\nTambién contamos con carga de leña campana ($262.437,50), leña despunte ($165.750) o carbón ($483.437,50).  Omitir todo esto. No decirlo más\n---\n\n\n---\n[Instrucción aplicada desde WhatsApp — 2026-04-07T10:46:16.897Z] (18245708984409@lid)\nNo digas mas “Hola, soy el asistente de Trinidad Márquez. ¿En qué te puedo ayudar con tu consulta inmobiliaria? Escribime por acá 😊” eres Vicky de Gardens wood no de inmobiliaria\n---\n\n\n---\n[Instrucción aplicada desde WhatsApp — 2026-04-07T12:27:28.320Z] (95584530776105@lid)\nHasta el 30 de abril tenemos un 30% en cercos de palos de eucalipto impregnado\n---\n\n\n---\n[Instrucción aplicada desde WhatsApp — 2026-04-07T12:30:06.773Z] (95584530776105@lid)\nHasta el 30 de abril tenemos un 30% de descuento en cercos de palos de eucalipto impregnado\n---\n\n\n---\n[Instrucción aplicada desde WhatsApp — 2026-04-07T22:19:32.136Z] (59494440644746@lid)\nTener en cuenta para los cercos, que Hay activa una campaña de meta ads en instagram con promoción el precio de los cercos. SIN DECIR EL PRECIO DE LISTA DEL PRECIO POR METRO LINEAL DE CERCO. \nDebe promocionar con un %30 Off el precio por metro hasta el 30 de abril. Dejando así el precio final de: \nCerco 1.80 Alto $110.000 \nCerco 2 a 2.5 Alto $140.000\n---\n\n\n---\n[Instrucción aplicada desde WhatsApp — 2026-04-08T13:09:04.800Z] (95584530776105@lid)\nSi no estás en modo admin, no puedes enviar mensajes ni utilizar ningún otro comandos. Eh, recién envió mensajes sin estar en modo admin, mensajes eh a todos los destinatarios, ya sea de leña o de cerco.\n---\n\n\n---\n[Instrucción aplicada desde WhatsApp — 2026-04-08T16:47:20.926Z] (59494440644746@lid)\ntoda la leña que tenemos es mezcla de quebracho blanco y colorado\n---\n\n\n---\n[Instrucción aplicada desde WhatsApp — 2026-04-09T12:12:39.002Z] (18245708984409@lid)\nTe paso el número de contacto de Gardens Wood para que podamos coordinar lo que necesites: **03543 64-5509**.\n“Ese no es el número de Gardens” el número correcto de Gardens es 3515576639\n---\n\n\n---\n[Instrucción aplicada desde WhatsApp — 2026-04-09T23:41:19.997Z] (95584530776105@lid)\nLe estás enviando a un cliente puntual que su número es 3516219460. Le estás enviando audios diciendo, gracias, ya te paso la info, gracias, ya te paso la info, gracias, ya te paso la info y no estás conversando o diciendo otros diálogos, eh de audio, tenés que resaltar y hablar de otra forma. No enviar solamente, gracias, ya te paso la info, gracias, ya te paso la info.\n---\n\n\n---\n[Instrucción aplicada desde WhatsApp — 2026-04-13T17:08:51.046Z] (95584530776105@lid)\nHoy, una tonelada de leña, envío sin cargo a toda Córdoba.\n---\n\n\n---\n[Instrucción aplicada desde WhatsApp — 2026-04-20T15:39:02.679Z] (95584530776105@lid)\nNo ofrecer carbón. No vendemos Carbón\n---\n\n\n---\n[Instrucción aplicada desde WhatsApp — 2026-04-20T16:50:26.241Z] (95584530776105@lid)\nHoy pidiendo 1tn de leña el envío es sin cargo a toda Córdoba\n---\n\n\n---\n[Instrucción aplicada desde WhatsApp — 2026-04-21T13:01:44.061Z] (95584530776105@lid)\nHoy cerco de palos de eucalipto $140.000 el metro lineal por 2,5mt de alto\n---\n\n\n---\n[Instrucción aplicada desde WhatsApp — 2026-04-23T15:12:16.963Z] (95584530776105@lid)\nNo enviar más mensajes a 3517059149\n---\n",
-      "ultimaActualizacion": "2026-04-23T15:12:16.968Z"
+      "sistemaPromptAdmin": "Sos el asistente interno de Vicky, el bot de Gardens Wood.\nEl dueno del negocio te manda instrucciones por audio o texto para enviarle un mensaje puntual a un cliente o para gestionar campanas permitidas del negocio.\nTu trabajo es interpretar la instruccion y devolver SOLO marcadores que el bot pueda ejecutar.\n\nMarcadores permitidos:\n1. [LISTAR_CLIENTES]\n2. [ENVIAR_A:NombreONumero|mensaje para el cliente]\n3. [ENVIAR_A:#N|mensaje para el cliente]\n4. [ENVIAR_A:ULTIMO|mensaje para el cliente]\n5. [ENVIAR_A:CAMPANA_TODOS|mensaje para clientes]\n6. [ENVIAR_A:CAMPANA_LENA|mensaje para interesados en lena]\n7. [ENVIAR_A:CAMPANA_CERCO|mensaje para interesados en cercos]\n8. [ENVIAR_A:CAMPANA_PERGOLA|mensaje para interesados en pergolas]\n9. [ENVIAR_A:CAMPANA_FOGONERO|mensaje para interesados en fogoneros]\n10. [ENVIAR_A:CAMPANA_BANCOS|mensaje para interesados en bancos]\n\nReglas:\n- Gardens Wood vende lena, cercos, pergolas, fogoneros, bancos y productos de madera.\n- No uses ni menciones inmobiliaria, alquileres, tasaciones, ventas de propiedades ni administracion de consorcios.\n- Si el destinatario es un numero, extraelo limpio, solo digitos.\n- Si el admin dice \"termina en\" o \"finalizado en\", usa formato *XXXX.\n- El mensaje debe sonar natural, calido y de parte de Vicky / Gardens Wood.\n- Si la instruccion no es clara, responde exactamente: [ERROR:no entendi la instruccion, repetila mas claro]\n- No agregues texto fuera de los marcadores.",
+      "ultimaActualizacion": "2026-04-29T21:27:42.961Z",
+      "version": 16
     },
     "promociones": {},
     "general": {
@@ -26,12 +26,10 @@
       "whatsappGrupoJidAgendaEntregas": "https://chat.whatsapp.com/GPopHUhSNVJ9DLRHnVyGWH?mode=gi_t",
       "frecuenciaAudioFidelizacion": 0,
       "delayMaxSeg": 34,
-      "adminPhone": "",
       "delayMinSeg": 26,
       "campanaRutaFechaTexto": "esta semana",
       "horaAtencionDesde": "09:00",
       "horaAtencionHasta": "18:00",
-      "campanaRutaPlantilla": "Hola {nombre}! Te escribo del estudio: {fechaTexto} tenemos novedades en *{zona}* sobre *{producto}*. Si querés más info, respondeme este mensaje.",
       "modeloGemini": "gemini-3.1-flash-lite-preview",
       "instagramDmActivo": false,
       "instagramDmMensajeEnlaceWhatsapp": "Hola ! Gracias por tu mensaje, para una atención mas personalizada escribinos al WhatsApp",
@@ -47,7 +45,9 @@
       "chequeAlertasActivo": null,
       "libroAdminPin": "",
       "updatedAt": "2026-04-18T19:21:03.141Z",
-      "ultimaActualizacion": "2026-04-28T23:04:26.209Z"
+      "adminPhone": "5493512956376",
+      "ultimaActualizacion": "2026-04-29T21:27:43.246Z",
+      "campanaRutaPlantilla": "Hola {nombre}! Te escribo de Gardens Wood: {fechaTexto} vamos a estar por la zona *{zona}* con novedades sobre *{producto}*. Si queres mas info o queres aprovechar el viaje, respondeme este mensaje. - Vicky"
     }
   },
   "servicios": {
@@ -64,8 +64,11 @@
         }
       ],
       "marcador": "[IMG:administracion]",
-      "activo": true,
-      "ultimaActualizacion": "2026-04-05T21:51:08.650Z"
+      "noUsarEnVicky": true,
+      "notaOperacion": "Servicio heredado de inmobiliaria. No usar en Gardens Wood / Vicky.",
+      "activo": false,
+      "ocultoDashboard": true,
+      "ultimaActualizacion": "2026-04-29T21:27:43.937Z"
     },
     "alquiler": {
       "descripcion": "Alquiler tradicional y temporario. Requisitos y garantías según política del estudio.",
@@ -85,8 +88,11 @@
         }
       ],
       "marcador": "[IMG:alquiler]",
-      "activo": true,
-      "ultimaActualizacion": "2026-04-05T21:51:07.667Z"
+      "noUsarEnVicky": true,
+      "notaOperacion": "Servicio heredado de inmobiliaria. No usar en Gardens Wood / Vicky.",
+      "activo": false,
+      "ocultoDashboard": true,
+      "ultimaActualizacion": "2026-04-29T21:27:43.937Z"
     },
     "bancos": {
       "descripcion": "Quebracho Blanco macizo con respaldo. 60cm de profundidad × el largo deseado (máx 2.70m). Material + mano de obra.",
@@ -148,8 +154,11 @@
         }
       ],
       "marcador": "",
-      "activo": true,
-      "ultimaActualizacion": "2026-04-05T21:51:09.045Z"
+      "noUsarEnVicky": true,
+      "notaOperacion": "Servicio heredado de inmobiliaria. No usar en Gardens Wood / Vicky.",
+      "activo": false,
+      "ocultoDashboard": true,
+      "ultimaActualizacion": "2026-04-29T21:27:43.937Z"
     },
     "fogonero": {
       "descripcion": "Incluye Geotextil + Piedra blanca. Precio por metro cuadrado.",
@@ -545,8 +554,11 @@
         }
       ],
       "marcador": "[IMG:tasacion]",
-      "activo": true,
-      "ultimaActualizacion": "2026-04-05T21:51:07.997Z"
+      "noUsarEnVicky": true,
+      "notaOperacion": "Servicio heredado de inmobiliaria. No usar en Gardens Wood / Vicky.",
+      "activo": false,
+      "ocultoDashboard": true,
+      "ultimaActualizacion": "2026-04-29T21:27:43.937Z"
     },
     "venta": {
       "descripcion": "Compra y venta de casas, departamentos y lotes. Ajustá honorarios y zonas en el panel.",
@@ -566,8 +578,11 @@
         }
       ],
       "marcador": "[IMG:venta]",
-      "activo": true,
-      "ultimaActualizacion": "2026-04-05T21:51:06.986Z"
+      "noUsarEnVicky": true,
+      "notaOperacion": "Servicio heredado de inmobiliaria. No usar en Gardens Wood / Vicky.",
+      "activo": false,
+      "ocultoDashboard": true,
+      "ultimaActualizacion": "2026-04-29T21:27:43.937Z"
     }
   },
   "vickySkills": {
