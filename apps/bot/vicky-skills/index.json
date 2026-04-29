@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "updatedAt": "2026-04-29",
+  "skills": [
+    {
+      "id": "vendedor",
+      "nombre": "VENDEDOR",
+      "archivo": "vendedor.md",
+      "activo": true,
+      "orden": 10
+    },
+    {
+      "id": "funciones-dashboard",
+      "nombre": "FUNCIONES_DASHBOARD",
+      "archivo": "funciones-dashboard.md",
+      "activo": true,
+      "orden": 20
+    }
+  ]
+}

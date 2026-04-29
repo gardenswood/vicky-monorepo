@@ -53,6 +53,11 @@ service cloud.firestore {
         allow read: if isViewer();
         allow write: if isOperator();
       }
+
+      match /borradores/{borradorId} {
+        allow read: if isViewer();
+        allow write: if isOperator();
+      }
     }
 
     // ── Servicios (precios) ───────────────────────────────────────────────
@@ -65,6 +70,50 @@ service cloud.firestore {
     match /colaLena/{pedidoId} {
       allow read: if isViewer();
       allow write: if isOperator();
+    }
+
+    // ── Consultas manuales de leña por zona ───────────────────────────────
+    match /consultasLena/{consultaId} {
+      allow read: if isViewer();
+      allow write: if isOperator();
+    }
+
+    // ── Agenda y registros operativos ─────────────────────────────────────
+    match /entregas_agenda/{entregaId} {
+      allow read: if isViewer();
+      allow write: if isOperator();
+    }
+
+    match /datos_entrega_cliente/{registroId} {
+      allow read: if isViewer();
+      allow write: if isOperator();
+    }
+
+    match /lid_mapeo/{lidId} {
+      allow read: if isViewer();
+      allow write: if isOperator();
+    }
+
+    match /rutas_logistica/{rutaId} {
+      allow read: if isViewer();
+      allow write: if isOperator();
+    }
+
+    // ── Mensajes programados para el bot ──────────────────────────────────
+    match /mensajes_programados/{progId} {
+      allow read: if isViewer();
+      allow write: if isOperator();
+    }
+
+    // ── Skills internas de Vicky ──────────────────────────────────────────
+    match /vicky_skills/{skillId} {
+      allow read: if isViewer();
+      allow write: if isOperator();
+
+      match /versiones/{versionId} {
+        allow read: if isViewer();
+        allow write: if isOperator();
+      }
     }
 
     // ── Log de mensajes (analytics) ───────────────────────────────────────

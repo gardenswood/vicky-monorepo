@@ -5613,6 +5613,9 @@ async function recargarVickyGeminiSystemPrompt() {
         const promocionesConfig = await firestoreModule.getPromocionesConfig();
         const promocionesSuffix = firestoreModule.buildPromocionesPromptSuffix(promocionesConfig);
         if (promocionesSuffix) full += promocionesSuffix;
+        const vickySkills = await firestoreModule.getVickySkills();
+        const vickySkillsSuffix = firestoreModule.buildVickySkillsPromptSuffix(vickySkills);
+        if (vickySkillsSuffix) full += vickySkillsSuffix;
         full += SYSTEM_PROMPT_SUFIJO_UBICACION_MARCADORES;
         full += SYSTEM_PROMPT_SUFIJO_NOMBRE_SALUDO;
         full += SYSTEM_PROMPT_SUFIJO_COLA_LENA;
@@ -5662,6 +5665,12 @@ async function connectToWhatsApp(isReconnect = false) {
         if (promocionesSuffix) {
             SYSTEM_PROMPT_ACTIVO += promocionesSuffix;
             console.log('🏷️ Bloque PROMOCIONES_RESTRICCIONES_FIRESTORE anexado al system prompt.');
+        }
+        const vickySkills = await firestoreModule.getVickySkills();
+        const vickySkillsSuffix = firestoreModule.buildVickySkillsPromptSuffix(vickySkills);
+        if (vickySkillsSuffix) {
+            SYSTEM_PROMPT_ACTIVO += vickySkillsSuffix;
+            console.log('🧠 Bloque VICKY_SKILLS_FIRESTORE anexado al system prompt.');
         }
         SYSTEM_PROMPT_ACTIVO += SYSTEM_PROMPT_SUFIJO_UBICACION_MARCADORES;
         SYSTEM_PROMPT_ACTIVO += SYSTEM_PROMPT_SUFIJO_NOMBRE_SALUDO;

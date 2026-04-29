@@ -3,11 +3,11 @@ export const dynamic = 'force-dynamic'
 
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { doc, onSnapshot, updateDoc, serverTimestamp } from 'firebase/firestore'
+import { addDoc, collection, doc, onSnapshot, query, updateDoc, where, serverTimestamp } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import {
   ArrowLeft, Phone, MapPin, Package, Clock, Edit2, Save, X,
-  MessageSquare, ExternalLink, DollarSign,
+  MessageSquare, ExternalLink, DollarSign, Plus, AlertTriangle,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -36,6 +36,14 @@ interface Cliente {
   consentimientoDifusion?: boolean
 }
 
+interface ConsultaLenaActiva {
+  id: string
+  zona: string
+  cantidadKg: number
+  estado: string
+  notas?: string
+}
+
 export default function ClienteDetailPage() {
   const { tel } = useParams<{ tel: string }>()
   const router = useRouter()
@@ -46,6 +54,10 @@ export default function ClienteDetailPage() {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<Partial<Cliente>>({})
   const [saving, setSaving] = useState(false)
+  const [consultasLena, setConsultasLena] = useState<ConsultaLenaActiva[]>([])
+  const [consultaModal, setConsultaModal] = useState(false)
+  const [consultaForm, setConsultaForm] = useState({ cantidadKg: '', zona: '', notas: '' })
+  const [savingConsulta, setSavingConsulta] = useState(false)
 
   useEffect(() => {
     const unsub = onSnapshot(doc(db, 'clientes', telDecoded), (snap) => {
@@ -95,6 +107,27 @@ export default function ClienteDetailPage() {
     return () => unsub()
   }, [telDecoded])
 
+  useEffect(() => {
+    const q = query(collection(db, 'consultasLena'), where('tel', '==', telDecoded))
+    const unsub = onSnapshot(q, (snap) => {
+      setConsultasLena(
+        snap.docs
+          .map((docSnap) => {
+            const d = docSnap.data()
+            return {
+              id: docSnap.id,
+              zona: String(d.zona ?? 'Sin zona'),
+              cantidadKg: Number(d.cantidadKg ?? 0),
+              estado: String(d.estado ?? 'pendiente'),
+              notas: typeof d.notas === 'string' ? d.notas : undefined,
+            }
+          })
+          .filter((consulta) => consulta.estado !== 'enviado')
+      )
+    })
+    return () => unsub()
+  }, [telDecoded])
+
   async function saveChanges() {
     setSaving(true)
     try {
@@ -107,6 +140,36 @@ export default function ClienteDetailPage() {
       console.error(err)
     } finally {
       setSaving(false)
+    }
+  }
+
+  function openConsultaModal() {
+    setConsultaForm({ cantidadKg: '', zona: cliente?.zona ?? '', notas: '' })
+    setConsultaModal(true)
+  }
+
+  async function saveConsultaLena() {
+    if (!cliente) return
+    const kg = Number(consultaForm.cantidadKg)
+    if (!Number.isFinite(kg) || kg < 1 || kg > 499 || !consultaForm.zona.trim()) return
+    setSavingConsulta(true)
+    try {
+      await addDoc(collection(db, 'consultasLena'), {
+        remoteJid: cliente.remoteJid || `${cliente.tel}@s.whatsapp.net`,
+        tel: cliente.tel,
+        nombre: cliente.nombre || 'Sin nombre',
+        zona: consultaForm.zona.trim(),
+        cantidadKg: Math.round(kg),
+        notas: consultaForm.notas.trim() || null,
+        fechaConsulta: serverTimestamp(),
+        estado: 'pendiente',
+        origen: 'dashboard_cliente_detalle',
+        creadoEn: serverTimestamp(),
+        actualizadoEn: serverTimestamp(),
+      })
+      setConsultaModal(false)
+    } finally {
+      setSavingConsulta(false)
     }
   }
 
@@ -165,6 +228,12 @@ export default function ClienteDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={openConsultaModal}
+            className="btn-secondary flex items-center gap-1.5"
+          >
+            <Plus className="w-4 h-4" /> Registrar consulta leña
+          </button>
           <Link
             href={`/chats/${encodeURIComponent(cliente.remoteJid)}`}
             className="btn-secondary flex items-center gap-1.5"
@@ -195,6 +264,18 @@ export default function ClienteDetailPage() {
           )}
         </div>
       </div>
+
+      {consultasLena.length > 0 && (
+        <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 flex items-start gap-2">
+          <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="font-medium">Consulta de leña activa</p>
+            <p>
+              {consultasLena.reduce((sum, c) => sum + c.cantidadKg, 0)} kg en {consultasLena[0].zona}. Estado zona: {consultasLena[0].estado.replaceAll('_', ' ')}.
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-3 gap-5">
         {/* Main info */}
@@ -458,6 +539,55 @@ export default function ClienteDetailPage() {
           </div>
         </div>
       </div>
+      {consultaModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg">
+            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+              <h2 className="font-semibold text-slate-900">Registrar consulta leña</h2>
+              <button onClick={() => setConsultaModal(false)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="label">Cantidad kg</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={499}
+                    className="input"
+                    value={consultaForm.cantidadKg}
+                    onChange={(e) => setConsultaForm((f) => ({ ...f, cantidadKg: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="label">Zona</label>
+                  <input
+                    className="input"
+                    value={consultaForm.zona}
+                    onChange={(e) => setConsultaForm((f) => ({ ...f, zona: e.target.value }))}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="label">Notas</label>
+                <textarea
+                  className="input min-h-24"
+                  value={consultaForm.notas}
+                  onChange={(e) => setConsultaForm((f) => ({ ...f, notas: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-4">
+              <button onClick={() => setConsultaModal(false)} className="btn-secondary">Cancelar</button>
+              <button onClick={saveConsultaLena} disabled={savingConsulta} className="btn-primary">
+                {savingConsulta ? 'Guardando...' : 'Guardar consulta'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

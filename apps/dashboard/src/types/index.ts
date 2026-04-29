@@ -63,6 +63,29 @@ export interface ColaLena {
   estado: 'en_cola' | 'notificado' | 'entregado'
 }
 
+export interface ConsultaLena {
+  id: string
+  remoteJid: string
+  tel: string
+  nombre: string
+  zona: string
+  cantidadKg: number
+  notas?: string
+  fechaConsulta: Date
+  estado: 'pendiente' | 'zona_lista' | 'admin_notificado' | 'confirmado' | 'enviado'
+}
+
+export interface ZonaSummary {
+  zona: string
+  totalKg: number
+  cantidadConsultas: number
+  consultas: ConsultaLena[]
+  umbralKg: number
+  estado: 'normal' | 'cerca' | 'lista' | 'admin_notificado' | 'confirmado' | 'enviado'
+  fechaNotificacionAdmin?: Date
+  fechaConfirmacion?: Date
+}
+
 export interface PrecioItem {
   descripcion: string
   precio: number

@@ -11,6 +11,8 @@
     "docs:pdf": "node scripts/generate-knowledge-pdfs.js",
     "verify": "node scripts/verify-flow.js",
     "smoke:gemini": "node scripts/smoke-gemini-model.js",
+    "config:export": "node scripts/sync-vicky-config.js export",
+    "config:import": "node scripts/sync-vicky-config.js import",
     "labels:discover": "node scripts/discover-wa-labels.js",
     "geocode:clientes": "node scripts/geocodificar-clientes-direccion.js",
     "verify:cliente-agenda": "node scripts/verificar-cliente-agenda.js",

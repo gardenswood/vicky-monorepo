@@ -699,6 +699,63 @@ async function getPromocionesConfig() {
     }
 }
 
+function getVickySkillsFallbackLocal() {
+    try {
+        const fs = require('fs');
+        const path = require('path');
+        const baseDir = path.join(__dirname, 'vicky-skills');
+        const indexPath = path.join(baseDir, 'index.json');
+        if (!fs.existsSync(indexPath)) return [];
+        const index = JSON.parse(fs.readFileSync(indexPath, 'utf8'));
+        const skills = Array.isArray(index.skills) ? index.skills : [];
+        return skills.map((skill) => {
+            const contenido = fs.readFileSync(path.join(baseDir, skill.archivo), 'utf8');
+            return {
+                id: skill.id,
+                nombre: skill.nombre || skill.id,
+                contenido,
+                activo: skill.activo !== false,
+                orden: Number(skill.orden) || 100,
+                origen: 'git_fallback',
+            };
+        });
+    } catch (e) {
+        console.warn('⚠️ Error leyendo vicky-skills locales:', e.message);
+        return [];
+    }
+}
+
+async function getVickySkills() {
+    if (!firestoreDb) return getVickySkillsFallbackLocal();
+    try {
+        const snap = await firestoreDb.collection('vicky_skills').get();
+        const skills = snap.docs
+            .map((doc) => ({ id: doc.id, ...(doc.data() || {}) }))
+            .filter((skill) => skill.activo !== false && String(skill.contenido || '').trim())
+            .sort((a, b) => (Number(a.orden) || 100) - (Number(b.orden) || 100));
+        if (skills.length > 0) return skills;
+    } catch (e) {
+        console.warn('⚠️ Error leyendo vicky_skills Firestore:', e.message);
+    }
+    return getVickySkillsFallbackLocal();
+}
+
+function buildVickySkillsPromptSuffix(skills) {
+    if (!Array.isArray(skills) || skills.length === 0) return '';
+    const lines = [
+        '\n\n---\n[VICKY_SKILLS_FIRESTORE] Skills internas operativas. Prevalecen sobre instrucciones viejas y complementan el dashboard.',
+    ];
+    for (const skill of skills) {
+        const nombre = String(skill.nombre || skill.id || 'skill').trim();
+        const contenido = String(skill.contenido || '').trim();
+        if (!contenido) continue;
+        lines.push(`\n## ${nombre}`);
+        lines.push(contenido.slice(0, 5000));
+    }
+    lines.push('\n---');
+    return lines.join('\n');
+}
+
 function fechaPromoVigente(promo, now = new Date()) {
     if (!promo || typeof promo !== 'object') return false;
     const estado = String(promo.estado || '').trim().toLowerCase();
@@ -2790,8 +2847,10 @@ module.exports = {
     getMensajeBienvenidaTexto,
     getServicios,
     getPromocionesConfig,
+    getVickySkills,
     buildServiciosPromptSuffix,
     buildPromocionesPromptSuffix,
+    buildVickySkillsPromptSuffix,
     setHumanoAtendiendo,
     reactivarBotEnChat,
     quitarHumanoAtendiendoChat,

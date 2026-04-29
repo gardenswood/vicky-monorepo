@@ -18,7 +18,6 @@ import {
   Bot,
   Truck,
   MapPin,
-  Route,
   Calendar,
   Megaphone,
 } from 'lucide-react'
@@ -40,35 +39,23 @@ const navItems = [
     icon: Users,
   },
   {
-    label: 'Configuración',
-    icon: Settings,
-      children: [
-      { label: 'Instrucciones AI', href: '/config/prompts', icon: Bot },
-      { label: 'Promos y restricciones', href: '/config/promociones', icon: Megaphone },
-      { label: 'Borradores prompt (legado)', href: '/config/prompt-borradores', icon: FileText },
-      { label: 'Precios y servicios', href: '/config/precios', icon: DollarSign },
-      { label: 'General', href: '/config/general', icon: SlidersHorizontal },
+    label: 'Leña & Logística',
+    icon: Truck,
+    children: [
+      { label: 'Cola de leña', href: '/cola-lena', icon: Truck },
+      { label: 'Zonas & Consultas', href: '/logistica-zonas', icon: MapPin },
+      { label: 'Agenda de entregas', href: '/agenda-entregas', icon: Calendar },
     ],
   },
   {
-    label: 'Cola de leña',
-    href: '/cola-lena',
-    icon: Truck,
-  },
-  {
-    label: 'Agenda de entregas',
-    href: '/agenda-entregas',
-    icon: Calendar,
-  },
-  {
-    label: 'Mapa logística',
-    href: '/logistica-mapa',
-    icon: MapPin,
-  },
-  {
-    label: 'Ruta / campaña geo',
-    href: '/logistica-ruta',
-    icon: Route,
+    label: 'Configuración',
+    icon: Settings,
+    children: [
+      { label: 'Instrucciones AI', href: '/config/prompts', icon: Bot },
+      { label: 'Promos y restricciones', href: '/config/promociones', icon: Megaphone },
+      { label: 'Precios y servicios', href: '/config/precios', icon: DollarSign },
+      { label: 'General', href: '/config/general', icon: SlidersHorizontal },
+    ],
   },
   {
     label: 'Usuarios',

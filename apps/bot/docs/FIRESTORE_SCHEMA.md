@@ -114,7 +114,9 @@ Polilínea de reparto / corredor para campaña **geo** (`#ruta_geo` en WhatsApp 
 
 ### `mensajes_programados/{id}`
 
-Mensajes a enviar en una fecha/hora (`runAt`), creados por lógica del bot (p. ej. marcador `[AGENDAR:…]`). Campos típicos: `jid`, `texto` o prompt, `runAt`, `estado` (`pendiente` \| `enviado` \| `error`), `creadoEn`, `origen`. El cron HTTP del servicio Cloud Run procesa pendientes y actualiza estado.
+Mensajes a enviar en una fecha/hora (`runAt`), creados por lógica del bot (p. ej. marcador `[AGENDAR:…]`) o por el dashboard. Campos típicos: `jid`, `texto`, `runAt`, `estado` (`pendiente` \| `enviado` \| `error`), `creadoEn`, `origen`. El cron HTTP del servicio Cloud Run procesa pendientes y actualiza estado.
+
+**Contrato del bot:** el cron lee `texto` y `runAt` como `Timestamp`; `runAtMs` por sí solo no dispara envíos.
 
 ### `entregas_agenda/{id}`
 
@@ -168,6 +170,45 @@ Pedidos pequeños de leña (≤200 kg por marcador); **fuente operativa del bot*
 **Escritura bot:** `syncColaLena` en lotes (≤400 docs por tanda), `merge: true`. No borra documentos de clientes que ya no están en el array en memoria (solo actualiza el snapshot enviado). Tras cada cambio de cola: GCS + sync; al conectar/reconectar WhatsApp, si hay pedidos, se vuelve a sincronizar.
 
 **Disparo “zona cercana” (`config/general`):** con `colaLenaUmbralClusterZonaKg` (ej. 800) y prefijo común entre el primer token de `zona` o `dirección` de cada pedido (`colaLenaClusterZonaMinPrefijo`, default 6), el bot arma ruta aunque no se haya llegado a `colaLenaUmbralDisparoRutaKg`. Poné **`colaLenaUmbralClusterZonaKg: 0`** para desactivar. Tras armar la ruta: plantilla `colaLenaPlantillaWAClienteRutaArmada` a cada cliente (`{nombre}`, `{zona}`, `{kg}`), aviso al admin y copia opcional a `colaLenaTelefonoAvisoRutaCopia` (solo dígitos, ej. Juan).
+
+### `consultasLena/{consultaId}`
+
+Consultas manuales de clientes interesados en leña que todavía **no** son pedidos confirmados ni parte de `colaLena`. Las carga Vicky desde el panel cuando un cliente pide menos de un despacho mínimo o queda pendiente de agrupar por zona.
+
+| Campo | Tipo | Notas |
+|-------|------|--------|
+| `remoteJid` | string | JID WhatsApp del cliente (`…@s.whatsapp.net`). |
+| `tel` | string | Dígitos del teléfono; se usa para cruzar con `clientes/{tel}`. |
+| `nombre` | string | Nombre visible en el panel. |
+| `zona` | string | Zona libre para agrupar consultas y calcular umbral. |
+| `cantidadKg` | number | Consulta manual, validada en panel entre 1 y 499 kg. |
+| `notas` | string \| null | Texto interno opcional. |
+| `fechaConsulta` | Timestamp | Fecha de alta. |
+| `estado` | string | `pendiente` → `zona_lista` / `admin_notificado` → `confirmado` → `enviado`. |
+| `fechaNotificacionAdmin`, `fechaConfirmacion`, `fechaEnvio` | Timestamp opcional | Auditoría del flujo del panel. |
+| `origen` | string | ej. `dashboard`, `dashboard_clientes`, `dashboard_cliente_detalle`. |
+| `creadoEn`, `actualizadoEn` | Timestamp | Auditoría. |
+
+La página **Zonas & Consultas** (`/logistica-zonas`) agrupa estados activos (`pendiente`, `zona_lista`, `admin_notificado`, `confirmado`) por `zona`, usa `config/general.colaLenaUmbralClusterZonaKg` (default 800) y escribe en `mensajes_programados` para avisar al admin o a clientes. No reemplaza `colaLena`: cuando el pedido ya está confirmado para despacho, el flujo operativo sigue en `colaLena` / agenda.
+
+### `vicky_skills/{skillId}`
+
+Skills internas de Vicky versionadas en Git (`apps/bot/vicky-skills`) y editables desde el panel **Instrucciones AI → Skills Vicky**.
+
+| Campo | Tipo | Notas |
+|-------|------|--------|
+| `id` | string | `vendedor`, `funciones-dashboard`, etc. |
+| `nombre` | string | Nombre visible e inyectado al prompt. |
+| `contenido` | string | Markdown con reglas operativas para el bot. |
+| `activo` | bool | Si es `false`, el bot no la inyecta. |
+| `orden` | number | Orden de inyección en el system prompt. |
+| `archivo` | string opcional | Archivo fuente en Git. |
+| `origen` | string | `git`, `dashboard`, etc. |
+| `actualizadoEn` | Timestamp | Auditoría. |
+
+Subcolección `vicky_skills/{skillId}/versiones/{versionId}`: snapshots guardados por el dashboard antes de actualizar una skill.
+
+El bot lee `vicky_skills/*` al armar Gemini. Si Firestore no tiene skills, usa fallback local desde `apps/bot/vicky-skills/*.md`.
 
 ### `adminWaSesion/{docId}`
 

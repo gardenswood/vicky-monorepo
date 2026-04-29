@@ -1,0 +1,595 @@
+{
+  "exportedAt": "2026-04-29T19:52:26.767Z",
+  "source": "firebase",
+  "config": {
+    "prompts": {
+      "sistemaPromptAdmin": "Sos el asistente interno del bot inmobiliario.\nInterpretá instrucciones del administrador y respondé SOLO con marcadores:\n\n1. [LISTAR_CLIENTES]\n2. [ENVIAR_A:NombreONumero|mensaje]\n3. [ENVIAR_A:#N|mensaje]\n4. [ENVIAR_A:ULTIMO|mensaje]\n5. [ENVIAR_A:ULTIMO_VENTA|mensaje], [ENVIAR_A:ULTIMO_ALQUILER|mensaje], [ENVIAR_A:ULTIMO_TASACION|mensaje], [ENVIAR_A:ULTIMO_ADMINISTRACION|mensaje]\n6. [ENVIAR_A:CAMPANA_TODOS|mensaje], [ENVIAR_A:CAMPANA_CLIENTES|mensaje]\n7. [ENVIAR_A:CAMPANA_VENTA|mensaje], [ENVIAR_A:CAMPANA_ALQUILER|mensaje], [ENVIAR_A:CAMPANA_TASACION|mensaje], [ENVIAR_A:CAMPANA_ADMINISTRACION|mensaje]\n\nReglas: números solo dígitos; \"termina en\" → *XXXX; tono profesional; si no entendés: [ERROR:no entendí la instrucción, repetila más claro]; sin texto fuera de los marcadores.",
+      "mensajeBienvenidaTexto": "",
+      "mensajeClienteCierreEntregaHumano": "",
+      "instruccionCierreEntregaHumanoGemini": "",
+      "version": 14,
+      "sistemaPrompt": "eres vicky de Gardens wood \n\n---\n[Instrucción aplicada desde WhatsApp — 2026-04-06T21:38:44.205Z] (18245708984409@lid)\nEn Vicky bot leña 🪵 no vende nada de inmobiliaria. Borra todo de tu info de alquileres, venta de casas, tasación. Todo relacionado con trinidad Márquez. No digas nada de eso en los chat de Vicky bot leña\n---\n\n\n---\n[Instrucción aplicada desde WhatsApp — 2026-04-06T23:48:49.313Z] (95584530776105@lid)\nLa dirección de Gardens es Av. Rio de Janeiro 1281 Villa Allende\n---\n\n\n---\n[Instrucción aplicada desde WhatsApp — 2026-04-06T23:49:19.419Z] (95584530776105@lid)\nNo pases más el Alias ni cuentas bancarias\n---\n\n\n---\n[Instrucción aplicada desde WhatsApp — 2026-04-06T23:50:24.247Z] (95584530776105@lid)\nPuedes decir otra cosa en audio relacionado al trabajo porsupuesto, no solamente \"bueno ya te paso la info\"\n---\n\n\n---\n[Instrucción aplicada desde WhatsApp — 2026-04-07T01:00:32.130Z] (18245708984409@lid)\nTambién contamos con carga de leña campana ($262.437,50), leña despunte ($165.750) o carbón ($483.437,50).  Omitir todo esto. No decirlo más\n---\n\n\n---\n[Instrucción aplicada desde WhatsApp — 2026-04-07T10:46:16.897Z] (18245708984409@lid)\nNo digas mas “Hola, soy el asistente de Trinidad Márquez. ¿En qué te puedo ayudar con tu consulta inmobiliaria? Escribime por acá 😊” eres Vicky de Gardens wood no de inmobiliaria\n---\n\n\n---\n[Instrucción aplicada desde WhatsApp — 2026-04-07T12:27:28.320Z] (95584530776105@lid)\nHasta el 30 de abril tenemos un 30% en cercos de palos de eucalipto impregnado\n---\n\n\n---\n[Instrucción aplicada desde WhatsApp — 2026-04-07T12:30:06.773Z] (95584530776105@lid)\nHasta el 30 de abril tenemos un 30% de descuento en cercos de palos de eucalipto impregnado\n---\n\n\n---\n[Instrucción aplicada desde WhatsApp — 2026-04-07T22:19:32.136Z] (59494440644746@lid)\nTener en cuenta para los cercos, que Hay activa una campaña de meta ads en instagram con promoción el precio de los cercos. SIN DECIR EL PRECIO DE LISTA DEL PRECIO POR METRO LINEAL DE CERCO. \nDebe promocionar con un %30 Off el precio por metro hasta el 30 de abril. Dejando así el precio final de: \nCerco 1.80 Alto $110.000 \nCerco 2 a 2.5 Alto $140.000\n---\n\n\n---\n[Instrucción aplicada desde WhatsApp — 2026-04-08T13:09:04.800Z] (95584530776105@lid)\nSi no estás en modo admin, no puedes enviar mensajes ni utilizar ningún otro comandos. Eh, recién envió mensajes sin estar en modo admin, mensajes eh a todos los destinatarios, ya sea de leña o de cerco.\n---\n\n\n---\n[Instrucción aplicada desde WhatsApp — 2026-04-08T16:47:20.926Z] (59494440644746@lid)\ntoda la leña que tenemos es mezcla de quebracho blanco y colorado\n---\n\n\n---\n[Instrucción aplicada desde WhatsApp — 2026-04-09T12:12:39.002Z] (18245708984409@lid)\nTe paso el número de contacto de Gardens Wood para que podamos coordinar lo que necesites: **03543 64-5509**.\n“Ese no es el número de Gardens” el número correcto de Gardens es 3515576639\n---\n\n\n---\n[Instrucción aplicada desde WhatsApp — 2026-04-09T23:41:19.997Z] (95584530776105@lid)\nLe estás enviando a un cliente puntual que su número es 3516219460. Le estás enviando audios diciendo, gracias, ya te paso la info, gracias, ya te paso la info, gracias, ya te paso la info y no estás conversando o diciendo otros diálogos, eh de audio, tenés que resaltar y hablar de otra forma. No enviar solamente, gracias, ya te paso la info, gracias, ya te paso la info.\n---\n\n\n---\n[Instrucción aplicada desde WhatsApp — 2026-04-13T17:08:51.046Z] (95584530776105@lid)\nHoy, una tonelada de leña, envío sin cargo a toda Córdoba.\n---\n\n\n---\n[Instrucción aplicada desde WhatsApp — 2026-04-20T15:39:02.679Z] (95584530776105@lid)\nNo ofrecer carbón. No vendemos Carbón\n---\n\n\n---\n[Instrucción aplicada desde WhatsApp — 2026-04-20T16:50:26.241Z] (95584530776105@lid)\nHoy pidiendo 1tn de leña el envío es sin cargo a toda Córdoba\n---\n\n\n---\n[Instrucción aplicada desde WhatsApp — 2026-04-21T13:01:44.061Z] (95584530776105@lid)\nHoy cerco de palos de eucalipto $140.000 el metro lineal por 2,5mt de alto\n---\n\n\n---\n[Instrucción aplicada desde WhatsApp — 2026-04-23T15:12:16.963Z] (95584530776105@lid)\nNo enviar más mensajes a 3517059149\n---\n",
+      "ultimaActualizacion": "2026-04-23T15:12:16.968Z"
+    },
+    "promociones": {},
+    "general": {
+      "tiempoSilencioHumanoHoras": 24,
+      "botActivo": true,
+      "datosEntregaNotifyPhone": "5493512956376",
+      "campanaDelayMinSeg": 15,
+      "campanaDelayMaxSeg": 20,
+      "campanaMaxDestinatarios": 40,
+      "campanaDescuentoPct": 10,
+      "geocodeCronActivo": true,
+      "geocodeCronMaxPorEjecucion": 30,
+      "notificarAgendaEntregasGrupoActivo": true,
+      "whatsappGrupoJidAgendaEntregas": "https://chat.whatsapp.com/GPopHUhSNVJ9DLRHnVyGWH?mode=gi_t",
+      "frecuenciaAudioFidelizacion": 0,
+      "delayMaxSeg": 34,
+      "adminPhone": "",
+      "delayMinSeg": 26,
+      "campanaRutaFechaTexto": "esta semana",
+      "horaAtencionDesde": "09:00",
+      "horaAtencionHasta": "18:00",
+      "campanaRutaPlantilla": "Hola {nombre}! Te escribo del estudio: {fechaTexto} tenemos novedades en *{zona}* sobre *{producto}*. Si querés más info, respondeme este mensaje.",
+      "modeloGemini": "gemini-3.1-flash-lite-preview",
+      "instagramDmActivo": false,
+      "instagramDmMensajeEnlaceWhatsapp": "Hola ! Gracias por tu mensaje, para una atención mas personalizada escribinos al WhatsApp",
+      "instagramDmSoloEnlaceWhatsapp": true,
+      "whatsappAtencionCliente": "3515576639",
+      "whatsappLabelIdContactarAsesor": "",
+      "libroAdminFraseSalida": "",
+      "libroUltimoNumeroCompra": null,
+      "chequeAlertasDias": [
+        7
+      ],
+      "libroAdminFraseEntrada": "",
+      "chequeAlertasActivo": null,
+      "libroAdminPin": "",
+      "updatedAt": "2026-04-18T19:21:03.141Z",
+      "ultimaActualizacion": "2026-04-28T23:04:26.209Z"
+    }
+  },
+  "servicios": {
+    "administracion": {
+      "descripcion": "Gestión de contratos, cobranzas y consorcios si aplica.",
+      "tieneEnvio": false,
+      "id": "administracion",
+      "nombre": "Administración de alquileres / consorcios",
+      "precios": [
+        {
+          "descripcion": "Fee administración (referencia)",
+          "precio": 0,
+          "unidad": "consultar"
+        }
+      ],
+      "marcador": "[IMG:administracion]",
+      "activo": true,
+      "ultimaActualizacion": "2026-04-05T21:51:08.650Z"
+    },
+    "alquiler": {
+      "descripcion": "Alquiler tradicional y temporario. Requisitos y garantías según política del estudio.",
+      "tieneEnvio": false,
+      "id": "alquiler",
+      "nombre": "Alquiler",
+      "precios": [
+        {
+          "descripcion": "Honorarios locación (referencia %)",
+          "precio": 5,
+          "unidad": "% primer mes"
+        },
+        {
+          "descripcion": "Administración mensual (referencia)",
+          "precio": 0,
+          "unidad": "consultar"
+        }
+      ],
+      "marcador": "[IMG:alquiler]",
+      "activo": true,
+      "ultimaActualizacion": "2026-04-05T21:51:07.667Z"
+    },
+    "bancos": {
+      "descripcion": "Quebracho Blanco macizo con respaldo. 60cm de profundidad × el largo deseado (máx 2.70m). Material + mano de obra.",
+      "tieneEnvio": false,
+      "id": "bancos",
+      "nombre": "Bancos de Quebracho Blanco",
+      "precios": [
+        {
+          "descripcion": "Banco con respaldo (Quebracho Blanco)",
+          "precio": 355000,
+          "unidad": "metro lineal"
+        }
+      ],
+      "marcador": "[IMG:bancos]",
+      "activo": true,
+      "ultimaActualizacion": "2026-03-27T19:26:40.471Z"
+    },
+    "cerco": {
+      "descripcion": "Eucalipto Impregnado CCA (más de 15 años sin mantenimiento). Material + mano de obra. Seña: $200.000 a $300.000. Saldo en efectivo al finalizar.",
+      "tieneEnvio": false,
+      "id": "cerco",
+      "nombre": "Cercos de madera",
+      "precios": [
+        {
+          "descripcion": "1.80m de alto",
+          "precio": 140000,
+          "unidad": "metro lineal"
+        },
+        {
+          "descripcion": "2.00m a 2.50m de alto",
+          "precio": 170000,
+          "unidad": "metro lineal"
+        },
+        {
+          "descripcion": "Hasta 3.00m de alto (medida especial)",
+          "precio": 185000,
+          "unidad": "metro lineal"
+        },
+        {
+          "descripcion": "Revestimiento con palo fino",
+          "precio": 150000,
+          "unidad": "metro lineal"
+        }
+      ],
+      "marcador": "[IMG:cerco]",
+      "activo": true,
+      "ultimaActualizacion": "2026-03-27T19:26:39.187Z"
+    },
+    "consultoria": {
+      "descripcion": "Asesoramiento en inversiones, desarrollos o proyectos.",
+      "tieneEnvio": false,
+      "id": "consultoria",
+      "nombre": "Consultoría / desarrollo",
+      "precios": [
+        {
+          "descripcion": "Consulta inicial",
+          "precio": 0,
+          "unidad": "agendar"
+        }
+      ],
+      "marcador": "",
+      "activo": true,
+      "ultimaActualizacion": "2026-04-05T21:51:09.045Z"
+    },
+    "fogonero": {
+      "descripcion": "Incluye Geotextil + Piedra blanca. Precio por metro cuadrado.",
+      "tieneEnvio": false,
+      "id": "fogonero",
+      "nombre": "Sector Fogonero",
+      "precios": [
+        {
+          "descripcion": "Base (Geotextil + Piedra blanca)",
+          "precio": 57000,
+          "unidad": "m²"
+        }
+      ],
+      "marcador": "[IMG:fogonero]",
+      "activo": true,
+      "ultimaActualizacion": "2026-03-27T19:26:40.153Z"
+    },
+    "lena": {
+      "tieneEnvio": true,
+      "id": "lena",
+      "nombre": "Leña",
+      "precios": [
+        {
+          "descripcion": "Hogar / Grande",
+          "precio": 290000,
+          "unidad": "tonelada"
+        },
+        {
+          "descripcion": "Salamandra / Mediana",
+          "precio": 300000,
+          "unidad": "tonelada"
+        },
+        {
+          "descripcion": "Parrilla / Fino (Quebracho Blanco)",
+          "precio": 320000,
+          "unidad": "tonelada"
+        },
+        {
+          "descripcion": "Leña campana (por carga)",
+          "precio": 262437.5,
+          "unidad": "carga"
+        },
+        {
+          "descripcion": "Leña despunte (por carga)",
+          "precio": 165750,
+          "unidad": "carga"
+        },
+        {
+          "descripcion": "Carbón (por carga)",
+          "precio": 483437.5,
+          "unidad": "carga"
+        }
+      ],
+      "marcador": "[IMG:lena]",
+      "activo": true,
+      "descripcion": "Leña de Quebracho Blanco y Colorado, mezcla versátil para hogar, salamandra y parrilla. Precio por tonelada (1000 kg).",
+      "infoEnvio": "Villa Allende: envío sin cargo en pedidos de más de 500 kg. Zonas cercanas (Mendiolaza, Valle del Sol, Saldán, La Calera, Argüello, Valle Escondido, Unquillo): costo extra de $45.000. Otras zonas: se cotiza según ubicación exacta.",
+      "ultimaActualizacion": "2026-03-27T19:26:38.476Z"
+    },
+    "madera": {
+      "descripcion": "Venta por unidad/metro. Todos los precios son + IVA. Retiro en local o envío a domicilio.",
+      "tieneEnvio": true,
+      "id": "madera",
+      "infoEnvio": "Pedidos de 1 unidad en Villa Allende: $20.000. Otros casos se cotiza.",
+      "nombre": "Productos de madera",
+      "precios": [
+        {
+          "descripcion": "Tabla QC 2,54×12,7cm × 2m",
+          "precio": 10574.85,
+          "unidad": "unidad"
+        },
+        {
+          "descripcion": "Tabla QC 2,54×12,7cm × 2,7m",
+          "precio": 14273.84,
+          "unidad": "unidad"
+        },
+        {
+          "descripcion": "Tabla QC 2,54×12,7cm × 3m",
+          "precio": 15859.52,
+          "unidad": "unidad"
+        },
+        {
+          "descripcion": "Tabla QC 2,54×15,24cm × 2m",
+          "precio": 12690.93,
+          "unidad": "unidad"
+        },
+        {
+          "descripcion": "Tabla QC 2,54×15,24cm × 2,7m",
+          "precio": 17133.03,
+          "unidad": "unidad"
+        },
+        {
+          "descripcion": "Tabla QC 2,54×15,24cm × 3m",
+          "precio": 19036.39,
+          "unidad": "unidad"
+        },
+        {
+          "descripcion": "Tabla QC 2,54×20,32cm × 2m",
+          "precio": 16920.32,
+          "unidad": "unidad"
+        },
+        {
+          "descripcion": "Tabla QC 2,54×20,32cm × 2,7m",
+          "precio": 22840.35,
+          "unidad": "unidad"
+        },
+        {
+          "descripcion": "Tabla QC 2,54×20,32cm × 3m",
+          "precio": 25381.85,
+          "unidad": "unidad"
+        },
+        {
+          "descripcion": "Tirante QC 5,08×10,16cm × 2,7m",
+          "precio": 22840.35,
+          "unidad": "unidad"
+        },
+        {
+          "descripcion": "Tirante QC 5,08×10,16cm × 3m",
+          "precio": 25381.85,
+          "unidad": "unidad"
+        },
+        {
+          "descripcion": "Tirante QC 5,08×15,24cm × 2,7m",
+          "precio": 34260.53,
+          "unidad": "unidad"
+        },
+        {
+          "descripcion": "Tablón QC 3,81×22,86cm × 1m",
+          "precio": 14273.84,
+          "unidad": "unidad"
+        },
+        {
+          "descripcion": "Tablón QC 3,81×22,86cm × 0,5m",
+          "precio": 7138.3,
+          "unidad": "unidad"
+        },
+        {
+          "descripcion": "Tablón QC 2,7m",
+          "precio": 154700,
+          "unidad": "unidad"
+        },
+        {
+          "descripcion": "Tablón QB 2,7m",
+          "precio": 91162.5,
+          "unidad": "unidad"
+        },
+        {
+          "descripcion": "Tablón QB 1,5m",
+          "precio": 52487.5,
+          "unidad": "unidad"
+        },
+        {
+          "descripcion": "Tablón para barras QC",
+          "precio": 247000,
+          "unidad": "metro lineal"
+        },
+        {
+          "descripcion": "Durmiente QC 12,7×25,4cm × 2,7m",
+          "precio": 104975,
+          "unidad": "unidad"
+        },
+        {
+          "descripcion": "Durmiente QC 12,7×25,4cm × 2m",
+          "precio": 69062.5,
+          "unidad": "unidad"
+        },
+        {
+          "descripcion": "Durmiente QC 2da 12,7×25,4cm × 2,7m",
+          "precio": 91000,
+          "unidad": "unidad"
+        },
+        {
+          "descripcion": "Durmiente QB 10,16×20,32cm × 2,7m",
+          "precio": 110500,
+          "unidad": "unidad"
+        },
+        {
+          "descripcion": "Durmiente QB 10,16×20,32cm × 2m",
+          "precio": 81900,
+          "unidad": "unidad"
+        },
+        {
+          "descripcion": "Durmiente QB 10,16×20,32cm × 1,5m",
+          "precio": 57980,
+          "unidad": "unidad"
+        },
+        {
+          "descripcion": "Durmiente recuperado",
+          "precio": 84500,
+          "unidad": "unidad"
+        },
+        {
+          "descripcion": "Poste QC 7,62×7,62cm × 3m",
+          "precio": 28550.44,
+          "unidad": "unidad"
+        },
+        {
+          "descripcion": "Poste QC 7,62×7,62cm × 2,7m",
+          "precio": 25696.78,
+          "unidad": "unidad"
+        },
+        {
+          "descripcion": "Poste QC 7,62×7,62cm × 2,2m",
+          "precio": 20936.99,
+          "unidad": "unidad"
+        },
+        {
+          "descripcion": "Poste QC 7,62×7,62cm × 2m",
+          "precio": 18895.5,
+          "unidad": "unidad"
+        },
+        {
+          "descripcion": "Poste QC 10,16×10,16cm × 3m",
+          "precio": 50752.65,
+          "unidad": "unidad"
+        },
+        {
+          "descripcion": "Poste QC 10,16×10,16cm × 2,7m",
+          "precio": 45677.94,
+          "unidad": "unidad"
+        },
+        {
+          "descripcion": "Poste QC 10,16×10,16cm × 2,4m",
+          "precio": 40603.23,
+          "unidad": "unidad"
+        },
+        {
+          "descripcion": "Poste QC 10,16×10,16cm × 2,2m",
+          "precio": 37219.17,
+          "unidad": "unidad"
+        },
+        {
+          "descripcion": "Poste QC 10,16×10,16cm × 2m",
+          "precio": 33835.1,
+          "unidad": "unidad"
+        },
+        {
+          "descripcion": "Poste QC 3m",
+          "precio": 28161.9,
+          "unidad": "unidad"
+        },
+        {
+          "descripcion": "Poste eucalipto 7,5m",
+          "precio": 101790,
+          "unidad": "unidad"
+        },
+        {
+          "descripcion": "Poste eucalipto 9m",
+          "precio": 113100,
+          "unidad": "unidad"
+        },
+        {
+          "descripcion": "Postecito eucalipto 2,5m",
+          "precio": 12874.55,
+          "unidad": "unidad"
+        },
+        {
+          "descripcion": "Varilla QB 3,81×5,08cm × 1,2m",
+          "precio": 1519.38,
+          "unidad": "unidad"
+        },
+        {
+          "descripcion": "Varilla QC 3,81×5,08cm × 1,2m",
+          "precio": 2624.38,
+          "unidad": "unidad"
+        },
+        {
+          "descripcion": "Viga 12,7×40,64cm × 3,5m",
+          "precio": 226525,
+          "unidad": "unidad"
+        },
+        {
+          "descripcion": "Tijera eucalipto 4m",
+          "precio": 42836.63,
+          "unidad": "unidad"
+        },
+        {
+          "descripcion": "Tijera eucalipto 5m",
+          "precio": 50541.57,
+          "unidad": "unidad"
+        },
+        {
+          "descripcion": "Tijera eucalipto 6m",
+          "precio": 64938.25,
+          "unidad": "unidad"
+        },
+        {
+          "descripcion": "Tijera eucalipto 7m",
+          "precio": 77426.38,
+          "unidad": "unidad"
+        },
+        {
+          "descripcion": "Tutor eucalipto 3/5 — 2,5m",
+          "precio": 5655,
+          "unidad": "unidad"
+        },
+        {
+          "descripcion": "Tutor eucalipto 5/7 — 2,5m",
+          "precio": 6833.13,
+          "unidad": "unidad"
+        },
+        {
+          "descripcion": "Boyero 1,8m",
+          "precio": 9896.25,
+          "unidad": "unidad"
+        },
+        {
+          "descripcion": "Tranquera 2m",
+          "precio": 303875,
+          "unidad": "unidad"
+        },
+        {
+          "descripcion": "Tranquera 3m",
+          "precio": 497250,
+          "unidad": "unidad"
+        },
+        {
+          "descripcion": "Mesa de jardín 2m",
+          "precio": 511062.5,
+          "unidad": "unidad"
+        },
+        {
+          "descripcion": "Hamaca",
+          "precio": 635375,
+          "unidad": "unidad"
+        },
+        {
+          "descripcion": "Muelitas",
+          "precio": 52000,
+          "unidad": "unidad"
+        },
+        {
+          "descripcion": "Cañizo criollo",
+          "precio": 14300,
+          "unidad": "m²"
+        },
+        {
+          "descripcion": "Cañizo tacuara",
+          "precio": 11700,
+          "unidad": "m²"
+        },
+        {
+          "descripcion": "Costaneros (por carga)",
+          "precio": 13812.5,
+          "unidad": "carga"
+        }
+      ],
+      "marcador": "",
+      "activo": true,
+      "ultimaActualizacion": "2026-03-27T19:26:41.107Z"
+    },
+    "pergola": {
+      "descripcion": "Material + mano de obra por metro cuadrado. Flete sin cargo en zonas cercanas a Villa Allende.",
+      "tieneEnvio": false,
+      "id": "pergola",
+      "nombre": "Pérgolas",
+      "precios": [
+        {
+          "descripcion": "Caña Tacuara",
+          "precio": 110000,
+          "unidad": "m²"
+        },
+        {
+          "descripcion": "Caña Tacuara + Chapa Policarbonato",
+          "precio": 130000,
+          "unidad": "m²"
+        },
+        {
+          "descripcion": "Palos Pergoleros eucalipto CCA",
+          "precio": 130000,
+          "unidad": "m²"
+        },
+        {
+          "descripcion": "Palos Pergoleros + Policarbonato",
+          "precio": 150000,
+          "unidad": "m²"
+        }
+      ],
+      "marcador": "[IMG:pergola]",
+      "activo": true,
+      "ultimaActualizacion": "2026-03-27T19:26:39.476Z"
+    },
+    "tasacion": {
+      "descripcion": "Informes de valuación y tasaciones para bancos o particulares.",
+      "tieneEnvio": false,
+      "id": "tasacion",
+      "nombre": "Tasaciones",
+      "precios": [
+        {
+          "descripcion": "Informe tasación vivienda (desde)",
+          "precio": 0,
+          "unidad": "presupuesto"
+        }
+      ],
+      "marcador": "[IMG:tasacion]",
+      "activo": true,
+      "ultimaActualizacion": "2026-04-05T21:51:07.997Z"
+    },
+    "venta": {
+      "descripcion": "Compra y venta de casas, departamentos y lotes. Ajustá honorarios y zonas en el panel.",
+      "tieneEnvio": false,
+      "id": "venta",
+      "nombre": "Venta de propiedades",
+      "precios": [
+        {
+          "descripcion": "Honorarios venta (referencia %)",
+          "precio": 3,
+          "unidad": "% sobre valor publicado"
+        },
+        {
+          "descripcion": "Tasación express (referencia)",
+          "precio": 0,
+          "unidad": "consultar"
+        }
+      ],
+      "marcador": "[IMG:venta]",
+      "activo": true,
+      "ultimaActualizacion": "2026-04-05T21:51:06.986Z"
+    }
+  },
+  "vickySkills": {
+    "funciones-dashboard": {
+      "contenido": "# VICKY_SKILL: FUNCIONES_DASHBOARD\r\n\r\n## Propósito\r\n\r\nUsar las funciones operativas del dashboard como herramientas de gestión comercial y atención, respetando las colecciones Firestore compartidas.\r\n\r\n## Mapa de funciones\r\n\r\n### Chats\r\n\r\n- Fuente: `chats/{jid}` y `chats/{jid}/mensajes`.\r\n- Usos: leer contexto reciente, respetar `humanoAtendiendo` y `silenciadoHasta`, registrar mensajes y marcadores.\r\n- Acción: si humano atiende, Vicky debe callarse hasta reactivación o vencimiento del silencio.\r\n\r\n### Clientes CRM\r\n\r\n- Fuente: `clientes/{tel}`.\r\n- Usos: nombre, zona, dirección, intereses, urgencia, potencial, estado CRM, servicio pendiente y próximo contacto.\r\n- Acción: completar datos con marcadores CRM cuando el cliente los da naturalmente.\r\n\r\n### Agenda de entregas\r\n\r\n- Fuente: `entregas_agenda/{id}`.\r\n- Usos: registrar entregas con fecha concreta, hora, título, dirección, producto, kg, teléfono y JID.\r\n- Acción: usar `[ENTREGA:YYYY-MM-DD|HH:mm o --|título]` cuando haya entrega concreta.\r\n- No confundir con recordatorios: `[AGENDAR:fecha|texto]` escribe en `mensajes_programados`.\r\n\r\n### Mensajes programados\r\n\r\n- Fuente: `mensajes_programados/{id}`.\r\n- Campos obligatorios: `jid`, `texto`, `runAt`, `estado: pendiente`, `origen`.\r\n- Usos: recordatorios, campañas, avisos al admin y mensajes escalonados.\r\n\r\n### Cola de leña\r\n\r\n- Fuente operativa del bot: GCS/RAM; espejo dashboard: `colaLena/{id}`.\r\n- Usos: pedidos de leña confirmados listos para despacho.\r\n- Acción: no editar la cola desde consultas pendientes; pasar por el flujo confirmado.\r\n\r\n### Consultas de leña por zona\r\n\r\n- Fuente: `consultasLena/{id}`.\r\n- Usos: interés manual pendiente por zona, acumulación de kg, aviso al admin y campañas cuando la zona está lista.\r\n- Estados: `pendiente`, `zona_lista`, `admin_notificado`, `confirmado`, `enviado`.\r\n\r\n### Configuración\r\n\r\n- `config/general`: delays, bot activo, teléfonos admin, campañas, geocode, grupo agenda, umbrales de leña.\r\n- `config/prompts`: instrucciones principales, admin, bienvenida y cierre de entrega.\r\n- `config/promociones`: promociones/restricciones vigentes.\r\n- `servicios/*`: catálogo, precios, envío, marcadores de imágenes y servicios activos.\r\n- `vicky_skills/*`: capacidades internas versionadas para Vicky.\r\n\r\n## Regla de sincronización\r\n\r\nTodo cambio operativo importante debe quedar en Firebase para ejecución, en dashboard para gestión humana y en Git como snapshot auditable cuando modifique instrucciones, skills, precios, promociones o comportamiento estable.\r\n",
+      "archivo": "funciones-dashboard.md",
+      "id": "funciones-dashboard",
+      "orden": 20,
+      "origen": "git",
+      "actualizadoEn": "2026-04-29T19:52:12.724Z",
+      "nombre": "FUNCIONES_DASHBOARD",
+      "activo": true
+    },
+    "vendedor": {
+      "contenido": "# VICKY_SKILL: VENDEDOR\r\n\r\n## Propósito\r\n\r\nConvertir cada conversación en una atención clara, cálida y orientada a venta, sin inventar precios, stock, fechas ni condiciones fuera de lo que indiquen Firestore y el dashboard.\r\n\r\n## Reglas de venta\r\n\r\n- Priorizar resolver la consulta del cliente en el menor número de mensajes posible.\r\n- Detectar intención: precio, medidas, envío, urgencia, zona, forma de pago, presupuesto, comparación o reclamo.\r\n- Usar siempre los precios y condiciones vigentes del bloque `DATOS_SERVICIOS_FIRESTORE`.\r\n- Aplicar promociones y restricciones vigentes del bloque `PROMOCIONES_RESTRICCIONES_FIRESTORE` por encima de textos viejos del prompt.\r\n- Pedir solo los datos que faltan para avanzar: producto, medida/cantidad, zona/dirección y plazo deseado.\r\n- Cuando el cliente está interesado pero no confirma, registrar seguimiento con CRM y proponer un siguiente paso concreto.\r\n- Cuando el pedido necesita humano, usar handoff sin prometer fecha ni visita técnica no confirmada.\r\n\r\n## Leña\r\n\r\n- Si el cliente consulta por leña, preguntar uso si falta: hogar, salamandra o parrilla.\r\n- Si pide una cantidad chica que conviene agrupar por zona, registrar la intención con los datos disponibles y explicar que se coordina reparto cuando haya volumen por la zona.\r\n- Para pedidos confirmados, usar los marcadores/flujo de cola de leña definidos por el sistema.\r\n- No mezclar `consultasLena` con `colaLena`: la primera es interés pendiente; la segunda es pedido confirmado operativo.\r\n\r\n## CRM y seguimiento\r\n\r\n- Actualizar CRM cuando aparezcan datos útiles: nombre, zona, dirección, interés, urgencia, potencial, estado comercial y próximo contacto.\r\n- Usar potencial:\r\n  - `caliente`: pide precio concreto, envío, fecha, pago o confirma intención.\r\n  - `tibio`: consulta opciones o compara.\r\n  - `frio`: solo pide información general o mira catálogo.\r\n- Si hay silencio humano activo, no insistir ni pisar al operador.\r\n\r\n## Límites\r\n\r\n- No inventar descuentos.\r\n- No confirmar entregas, instalaciones o visitas sin dato explícito o intervención humana.\r\n- No responder en grupos salvo flujos administrativos habilitados por el sistema.\r\n- No pedir comprobante de transferencia salvo que las reglas vigentes lo permitan.\r\n",
+      "archivo": "vendedor.md",
+      "id": "vendedor",
+      "orden": 10,
+      "origen": "git",
+      "actualizadoEn": "2026-04-29T19:52:12.724Z",
+      "nombre": "VENDEDOR",
+      "activo": true
+    }
+  }
+}
