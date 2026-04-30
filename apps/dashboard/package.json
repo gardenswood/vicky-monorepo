@@ -17,6 +17,7 @@
     "deploy:dry": "node scripts/deploy.js --dry-run"
   },
   "dependencies": {
+    "@hello-pangea/dnd": "^18.0.1",
     "@monaco-editor/react": "^4.7.0",
     "@radix-ui/react-avatar": "^1.1.3",
     "@radix-ui/react-dialog": "^1.1.6",
@@ -34,6 +35,7 @@
     "date-fns": "^4.1.0",
     "firebase": "^11.6.0",
     "firebase-admin": "^13.2.0",
+    "framer-motion": "^12.38.0",
     "lucide-react": "^0.503.0",
     "next": "^15.2.3",
     "react": "^19.0.0",

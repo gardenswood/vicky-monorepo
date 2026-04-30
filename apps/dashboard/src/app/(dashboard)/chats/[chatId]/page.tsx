@@ -9,29 +9,24 @@ import {
   orderBy,
   onSnapshot,
   doc,
-  getDoc,
   updateDoc,
   Timestamp,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import {
-  ArrowLeft,
   Bot,
   User,
-  Phone,
-  MapPin,
-  Package,
-  Clock,
   BellOff,
   Bell,
   Mic,
   Image as ImageIcon,
   FileText,
   ExternalLink,
+  PanelRightOpen,
 } from 'lucide-react'
 import { format } from 'date-fns'
-import { es } from 'date-fns/locale'
-import { cn, SERVICIO_LABELS, ESTADO_LABELS, ESTADO_COLORS, formatRelative } from '@/lib/utils'
+import { cn, ESTADO_LABELS, ESTADO_COLORS } from '@/lib/utils'
+import { LeadDrawer } from '@/components/LeadDrawer'
 
 interface Mensaje {
   id: string
@@ -43,47 +38,32 @@ interface Mensaje {
   servicio?: string
 }
 
-interface ChatInfo {
-  jid: string
-  tel: string
-  nombre?: string
-  estado?: string
-  servicioPendiente?: string
-  humanoAtendiendo?: boolean
-  direccion?: string
-  zona?: string
-  metodoPago?: string
-  pedidosAnteriores?: { servicio: string; descripcion: string; fecha?: Date }[]
-}
-
 export default function ChatDetailPage() {
   const { chatId } = useParams<{ chatId: string }>()
-  const router = useRouter()
   const jid = decodeURIComponent(chatId)
   const bottomRef = useRef<HTMLDivElement>(null)
 
   const [mensajes, setMensajes] = useState<Mensaje[]>([])
-  const [chatInfo, setChatInfo] = useState<ChatInfo | null>(null)
+  const [chatInfo, setChatInfo] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [toggling, setToggling] = useState(false)
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false)
 
   useEffect(() => {
-    // Load chat info
-    const chatRef = doc(db, 'chats', jid)
-    const unsubChat = onSnapshot(chatRef, (snap) => {
+    // Load chat info (we use the 'clientes' collection for full lead info to pass to the drawer)
+    // Wait, the chat document might not have all lead info. Let's fetch the client document.
+    const tel = jid.replace('@s.whatsapp.net', '')
+    const clienteRef = doc(db, 'clientes', tel)
+    const unsubCliente = onSnapshot(clienteRef, (snap) => {
       if (snap.exists()) {
-        const d = snap.data()
-        setChatInfo({
-          jid,
-          tel: d.tel || jid.replace('@s.whatsapp.net', ''),
-          nombre: d.nombre,
-          estado: d.estado,
-          servicioPendiente: d.servicioPendiente,
-          humanoAtendiendo: d.humanoAtendiendo,
-          direccion: d.direccion,
-          zona: d.zona,
-          metodoPago: d.metodoPago,
-          pedidosAnteriores: d.pedidosAnteriores || [],
+        setChatInfo({ tel: snap.id, ...snap.data() })
+      } else {
+        // Fallback to chat info if client doesn't exist yet
+        const chatRef = doc(db, 'chats', jid)
+        getDoc(chatRef).then(chatSnap => {
+          if (chatSnap.exists()) {
+             setChatInfo({ tel, ...chatSnap.data() })
+          }
         })
       }
     })
@@ -107,7 +87,7 @@ export default function ChatDetailPage() {
     })
 
     return () => {
-      unsubChat()
+      unsubCliente()
       unsubMensajes()
     }
   }, [jid])
@@ -153,7 +133,7 @@ export default function ChatDetailPage() {
 
   if (loading) {
     return (
-      <div className="h-screen flex items-center justify-center">
+      <div className="h-full flex items-center justify-center">
         <div className="animate-spin w-8 h-8 border-2 border-brand-600 border-t-transparent rounded-full" />
       </div>
     )
@@ -162,13 +142,9 @@ export default function ChatDetailPage() {
   const groups = groupByDate(mensajes)
 
   return (
-    <div className="h-screen flex flex-col">
+    <div className="h-full flex flex-col relative">
       {/* Header */}
       <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center gap-4 flex-shrink-0">
-        <button onClick={() => router.back()} className="text-slate-400 hover:text-slate-600 transition-colors">
-          <ArrowLeft className="w-5 h-5" />
-        </button>
-
         <div className="w-10 h-10 rounded-full bg-brand-100 flex items-center justify-center flex-shrink-0">
           <span className="text-brand-700 font-semibold">
             {chatInfo?.nombre?.[0]?.toUpperCase() ?? '?'}
@@ -197,7 +173,6 @@ export default function ChatDetailPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* WhatsApp link */}
           <a
             href={`https://wa.me/${chatInfo?.tel}`}
             target="_blank"
@@ -205,10 +180,9 @@ export default function ChatDetailPage() {
             className="btn-secondary flex items-center gap-1.5"
           >
             <ExternalLink className="w-4 h-4" />
-            Abrir WA
+            <span className="hidden sm:inline">Abrir WA</span>
           </a>
 
-          {/* Toggle bot silence */}
           <button
             onClick={toggleBotSilencio}
             disabled={toggling}
@@ -220,142 +194,102 @@ export default function ChatDetailPage() {
             )}
           >
             {chatInfo?.humanoAtendiendo ? (
-              <><Bell className="w-4 h-4" /> Reactivar bot</>
+              <><Bell className="w-4 h-4" /> <span className="hidden sm:inline">Reactivar bot</span></>
             ) : (
-              <><BellOff className="w-4 h-4" /> Silenciar bot</>
+              <><BellOff className="w-4 h-4" /> <span className="hidden sm:inline">Silenciar bot</span></>
             )}
+          </button>
+
+          <div className="w-px h-6 bg-slate-200 mx-1" />
+
+          <button
+            onClick={() => setIsDrawerOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-sm font-medium transition-colors"
+          >
+            <PanelRightOpen className="w-4 h-4" />
+            <span className="hidden sm:inline">Detalles</span>
           </button>
         </div>
       </div>
 
-      <div className="flex-1 flex overflow-hidden">
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto bg-slate-50 px-6 py-4 space-y-1">
-          {groups.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-slate-400 text-sm gap-2">
-              <Bot className="w-8 h-8 text-slate-300" />
-              <p>Sin mensajes registrados</p>
-            </div>
-          ) : (
-            groups.map((group) => (
-              <div key={group.date} className="space-y-2">
-                {/* Date separator */}
-                <div className="flex items-center gap-3 my-4">
-                  <div className="flex-1 h-px bg-slate-200" />
-                  <span className="text-xs text-slate-400 font-medium px-3 py-1 bg-slate-100 rounded-full">
-                    {group.date}
-                  </span>
-                  <div className="flex-1 h-px bg-slate-200" />
-                </div>
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto bg-[#efeae2] px-4 sm:px-8 py-6 space-y-1">
+        {groups.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full text-slate-500 text-sm gap-2 bg-white/50 rounded-xl p-8 max-w-sm mx-auto">
+            <Bot className="w-10 h-10 text-slate-300" />
+            <p>Sin mensajes registrados</p>
+          </div>
+        ) : (
+          groups.map((group) => (
+            <div key={group.date} className="space-y-2">
+              <div className="flex justify-center my-4">
+                <span className="text-xs text-slate-500 font-medium px-3 py-1.5 bg-white/80 shadow-sm rounded-lg backdrop-blur-sm">
+                  {group.date}
+                </span>
+              </div>
 
-                {group.messages.map((msg) => (
-                  <div
-                    key={msg.id}
-                    className={cn('flex animate-in', msg.direccion === 'saliente' ? 'justify-end' : 'justify-start')}
-                  >
-                    <div>
-                      {msg.direccion === 'entrante' && (
-                        <div className="flex items-center gap-1 mb-1 ml-1">
-                          <User className="w-3 h-3 text-slate-400" />
-                          <span className="text-xs text-slate-400">
-                            {chatInfo?.nombre || 'Cliente'}
-                          </span>
+              {group.messages.map((msg) => (
+                <div
+                  key={msg.id}
+                  className={cn('flex animate-in', msg.direccion === 'saliente' ? 'justify-end' : 'justify-start')}
+                >
+                  <div className="max-w-[85%] sm:max-w-[75%]">
+                    {msg.direccion === 'entrante' && (
+                      <div className="flex items-center gap-1 mb-1 ml-1">
+                        <User className="w-3 h-3 text-slate-500" />
+                        <span className="text-xs text-slate-500 font-medium">
+                          {chatInfo?.nombre || 'Cliente'}
+                        </span>
+                      </div>
+                    )}
+                    {msg.direccion === 'saliente' && (
+                      <div className="flex items-center gap-1 mb-1 mr-1 justify-end">
+                        <Bot className="w-3 h-3 text-brand-600" />
+                        <span className="text-xs text-brand-600 font-medium">Vicky</span>
+                      </div>
+                    )}
+                    <div className={cn(
+                      'px-4 py-2.5 rounded-2xl shadow-sm relative group',
+                      msg.direccion === 'saliente' 
+                        ? 'bg-[#d9fdd3] text-slate-800 rounded-tr-sm' 
+                        : 'bg-white text-slate-800 rounded-tl-sm'
+                    )}>
+                      {msg.tipo !== 'texto' && (
+                        <div className="flex items-center gap-1.5 mb-1 opacity-70 text-xs font-medium">
+                          <MensajeIcon tipo={msg.tipo} />
+                          <span className="capitalize">{msg.tipo}</span>
                         </div>
                       )}
-                      {msg.direccion === 'saliente' && (
-                        <div className="flex items-center gap-1 mb-1 mr-1 justify-end">
-                          <Bot className="w-3 h-3 text-brand-500" />
-                          <span className="text-xs text-brand-500">Vicky</span>
+                      <p className="text-[15px] whitespace-pre-wrap leading-relaxed">{msg.contenido}</p>
+                      {msg.marcadores && msg.marcadores.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {msg.marcadores.map((m, i) => (
+                            <span key={i} className="text-[10px] bg-black/5 text-slate-600 rounded px-1.5 py-0.5 font-mono">
+                              {m}
+                            </span>
+                          ))}
                         </div>
                       )}
-                      <div className={cn(msg.direccion === 'saliente' ? 'bubble-out' : 'bubble-in')}>
-                        {msg.tipo !== 'texto' && (
-                          <div className="flex items-center gap-1.5 mb-1 opacity-70 text-xs">
-                            <MensajeIcon tipo={msg.tipo} />
-                            <span className="capitalize">{msg.tipo}</span>
-                          </div>
-                        )}
-                        <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg.contenido}</p>
-                        {msg.marcadores && msg.marcadores.length > 0 && (
-                          <div className="mt-2 flex flex-wrap gap-1">
-                            {msg.marcadores.map((m, i) => (
-                              <span key={i} className="text-xs bg-black/10 rounded px-1.5 py-0.5 font-mono">
-                                {m}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                        <p className={cn(
-                          'text-xs mt-1.5',
-                          msg.direccion === 'saliente' ? 'text-white/60 text-right' : 'text-slate-400'
-                        )}>
+                      <div className="flex justify-end mt-1 -mb-1">
+                        <span className="text-[11px] text-slate-400">
                           {format(msg.timestamp, 'HH:mm')}
-                        </p>
+                        </span>
                       </div>
                     </div>
                   </div>
-                ))}
-              </div>
-            ))
-          )}
-          <div ref={bottomRef} />
-        </div>
-
-        {/* Client info panel */}
-        <div className="w-72 bg-white border-l border-slate-200 overflow-y-auto flex-shrink-0 p-5 space-y-5">
-          <h3 className="font-semibold text-slate-900 text-sm">Info del cliente</h3>
-
-          <div className="space-y-3">
-            <InfoRow icon={<Phone className="w-3.5 h-3.5" />} label="Teléfono" value={chatInfo?.tel} />
-            <InfoRow icon={<MapPin className="w-3.5 h-3.5" />} label="Dirección" value={chatInfo?.direccion} />
-            <InfoRow icon={<MapPin className="w-3.5 h-3.5" />} label="Zona" value={chatInfo?.zona} />
-            <InfoRow icon={<Package className="w-3.5 h-3.5" />} label="Servicio" value={chatInfo?.servicioPendiente ? SERVICIO_LABELS[chatInfo.servicioPendiente] : undefined} />
-            <InfoRow icon={<FileText className="w-3.5 h-3.5" />} label="Pago" value={chatInfo?.metodoPago} />
-          </div>
-
-          {chatInfo?.pedidosAnteriores && chatInfo.pedidosAnteriores.length > 0 && (
-            <div>
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Pedidos</p>
-              <div className="space-y-2">
-                {chatInfo.pedidosAnteriores.map((p, i) => (
-                  <div key={i} className="bg-slate-50 rounded-lg p-3">
-                    <p className="text-xs font-medium text-slate-700">{SERVICIO_LABELS[p.servicio] ?? p.servicio}</p>
-                    <p className="text-xs text-slate-500 mt-0.5">{p.descripcion}</p>
-                    {p.fecha && (
-                      <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        {formatRelative(p.fecha)}
-                      </p>
-                    )}
-                  </div>
-                ))}
-              </div>
+                </div>
+              ))}
             </div>
-          )}
-
-          <div className="pt-2">
-            <a
-              href={`/clientes/${encodeURIComponent(chatInfo?.tel ?? '')}`}
-              className="btn-secondary w-full text-center block text-xs"
-            >
-              Ver perfil completo
-            </a>
-          </div>
-        </div>
+          ))
+        )}
+        <div ref={bottomRef} />
       </div>
-    </div>
-  )
-}
 
-function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string; value?: string }) {
-  if (!value) return null
-  return (
-    <div className="flex items-start gap-2">
-      <div className="text-slate-400 mt-0.5">{icon}</div>
-      <div>
-        <p className="text-xs text-slate-400">{label}</p>
-        <p className="text-sm text-slate-700 font-medium">{value}</p>
-      </div>
+      <LeadDrawer
+        isOpen={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        cliente={chatInfo}
+      />
     </div>
   )
 }

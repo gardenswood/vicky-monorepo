@@ -60,19 +60,19 @@ export const SERVICIO_COLORS: Record<string, string> = {
 }
 
 export const ESTADO_LABELS: Record<string, string> = {
-  nuevo: 'Nuevo',
-  cotizacion: 'Cotización enviada',
-  cotizacion_enviada: 'Cotización enviada',
-  confirmado: 'Confirmado',
-  cliente: 'Cliente',
-  silenciado: 'Humano atendiendo',
+  capturados: 'Leads capturados',
+  clasificando: 'Clasificando leads',
+  cualificados: 'Leads cualificados',
+  vendiendo: 'Vendiendo',
+  ganado: 'Ganado',
+  perdido: 'Perdido',
 }
 
 export const ESTADO_COLORS: Record<string, string> = {
-  nuevo: 'bg-slate-100 text-slate-700',
-  cotizacion: 'bg-blue-100 text-blue-700',
-  cotizacion_enviada: 'bg-blue-100 text-blue-700',
-  confirmado: 'bg-green-100 text-green-700',
-  cliente: 'bg-brand-100 text-brand-700',
-  silenciado: 'bg-orange-100 text-orange-700',
+  capturados: 'bg-blue-100 text-blue-700',
+  clasificando: 'bg-fuchsia-100 text-fuchsia-700',
+  cualificados: 'bg-emerald-100 text-emerald-700',
+  vendiendo: 'bg-indigo-100 text-indigo-700',
+  ganado: 'bg-green-100 text-green-700',
+  perdido: 'bg-red-100 text-red-700',
 }

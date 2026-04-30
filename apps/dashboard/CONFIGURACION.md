@@ -23,9 +23,8 @@
 | Página | Función |
 |--------|---------|
 | `/` | Analytics: KPIs, gráficos de mensajes, distribución por servicio, embudo de conversión |
-| `/chats` | Todas las conversaciones con filtros por estado y servicio |
-| `/chats/[jid]` | Vista tipo WhatsApp de una conversación, en tiempo real |
-| `/clientes` | Base de datos de clientes con búsqueda, filtros y exportar CSV |
+| `/chats` | Interfaz de mensajería (Layout dividido) con lista de chats lateral y conversación activa. |
+| `/clientes` | Tablero Kanban interactivo (Drag & Drop) de leads por estados. Permite abrir el LeadDrawer para editar notas y detalles. |
 | `/clientes/[tel]` | Perfil completo del cliente, historial de pedidos, notas |
 | `/cola-lena` | Gestión de la cola logística de leña (pedidos ≤200kg) |
 | `/config/prompts` | Editor Monaco del SYSTEM_PROMPT que usa el bot |
