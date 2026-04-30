@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 import { collection, query, orderBy, onSnapshot, where } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { Search, MessageSquare, Filter, Clock, Bot, User } from 'lucide-react'
-import { formatTimestamp, getInitials, SERVICIO_LABELS, ESTADO_COLORS, ESTADO_LABELS } from '@/lib/utils'
+import { formatTimestamp, getInitials, SERVICIO_LABELS, ESTADO_COLORS, ESTADO_LABELS, getTelFromJid } from '@/lib/utils'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 
@@ -39,7 +39,7 @@ export default function ChatsPage() {
         const d = doc.data()
         return {
           jid: doc.id,
-          tel: d.tel || doc.id.replace('@s.whatsapp.net', ''),
+          tel: d.tel || getTelFromJid(doc.id),
           nombre: d.nombre,
           ultimoMensaje: d.ultimoMensaje,
           ultimoMensajeAt: d.ultimoMensajeAt?.toDate(),

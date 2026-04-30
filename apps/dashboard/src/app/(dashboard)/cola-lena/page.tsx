@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { collection, query, orderBy, onSnapshot, doc, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { Truck, Package, MapPin, Clock, CheckCircle2, AlertTriangle, Phone } from 'lucide-react'
-import { cn, formatRelative } from '@/lib/utils'
+import { cn, formatRelative, getTelFromJid } from '@/lib/utils'
 
 interface PedidoLena {
   id: string
@@ -182,7 +182,7 @@ export default function ColaLenaPage() {
                         className="text-xs text-brand-600 hover:text-brand-700 flex items-center gap-1"
                       >
                         <Phone className="w-3 h-3" />
-                        {pedido.remoteJid.replace('@s.whatsapp.net', '')}
+                        {getTelFromJid(pedido.remoteJid)}
                       </a>
                     </div>
                   </div>

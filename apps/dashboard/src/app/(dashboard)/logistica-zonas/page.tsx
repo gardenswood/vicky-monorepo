@@ -35,7 +35,7 @@ import {
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { db } from '@/lib/firebase'
-import { cn, formatRelative } from '@/lib/utils'
+import { cn, formatRelative, getTelFromJid } from '@/lib/utils'
 import type { ConsultaLena, ZonaSummary } from '@/types'
 
 const ESTADOS_ACTIVOS: ConsultaLena['estado'][] = [
@@ -88,7 +88,7 @@ function jidFromTel(tel: string): string {
 }
 
 function telFromJid(jid: string): string {
-  return jid.replace('@s.whatsapp.net', '').replace('@g.us', '')
+  return getTelFromJid(jid)
 }
 
 function normalizeZonaKey(zona: string): string {

@@ -54,6 +54,9 @@ ID de documento: dígitos de línea WhatsApp (sin `@s.whatsapp.net`) **o** `ig:{
 |---------------------|------|-----------------|
 | `telefono` | string (opcional) | Dígitos de la línea (suele coincidir con el id del doc cuando el chat es `@lid` mapeado). |
 | `whatsappLid` | string (opcional) | Identificador LID sin `@lid`; enlaza la ficha `clientes/{tel}` con el hilo real del cliente. |
+| `remoteJid` | string | JID técnico del hilo (`...@s.whatsapp.net`, `...@lid` o `ig:...`); se usa para abrir el chat correcto desde el panel. |
+| `nombre` | string (opcional) | Nombre comercial/manual del cliente; prioridad visual en CRM. |
+| `pushName` | string (opcional) | Nombre detectado desde WhatsApp o agenda del teléfono. Fallback visual si `nombre` todavía no fue completado. |
 | `potencial` | string | `frio`, `tibio`, `caliente` |
 | `statusCrm` | string | `pendiente_cotizacion`, `seguimiento`, `concreto`, `en_obra` |
 | `urgencia` | string | `alta`, `media`, `baja` |
@@ -71,6 +74,8 @@ ID de documento: dígitos de línea WhatsApp (sin `@s.whatsapp.net`) **o** `ig:{
 El geocodificador (cron / `npm run geocode:clientes`) arma la búsqueda con **dirección + barrio + localidad + zona + referencia + notas** (truncado) + Córdoba, Argentina.
 
 El bot puede rellenar CRM con marcadores internos en Gemini: `[CRM:…]`, `[DIRECCION:…]`, `[ZONA:…]`, `[BARRIO:…]`, `[LOCALIDAD:…]`, `[REFERENCIA:…]`, `[NOTAS_UBICACION:…]` (se eliminan antes de enviar al cliente). El CRM comercial es general para todos los servicios; la logística de leña queda separada en `consultasLena` / `/logistica-zonas` y `colaLena`.
+
+**Identidad en CRM:** el panel muestra `nombre` o `pushName` y prioriza `telefono` como teléfono visible. Si solo existe `@lid`, lo muestra como identificador técnico, no como número telefónico. La búsqueda del CRM incluye `nombre`, `pushName`, `telefono`, `remoteJid` y `whatsappLid`.
 
 **Chats `@lid`:** el id interno del chat no es el celular. El bot carga `lid_mapeo/*` al arranque, aprende LID→tel desde `contacts.upsert` de Baileys, y escribe la ficha en `clientes/{dígitos línea}`. Asociación manual admin: WhatsApp `!vicky #p lidmap LID_DIGITS TEL_DOC` (ej. `543516170743`) o `npm run seed:lid-mapeo -- LID TEL` en el repo del bot.
 

@@ -7,8 +7,8 @@ Este mapa define qué funciones humanas del dashboard tienen equivalente operati
 | Dashboard | Colecciones | Función humana | Uso de Vicky |
 |---|---|---|---|
 | `/chats` y `/chats/[chatId]` | `chats`, `chats/{jid}/mensajes` | Ver conversación, activar humano | Respetar `humanoAtendiendo` y `silenciadoHasta`; usar historial reciente |
-| `/clientes` | `clientes`, `consultasLena` | CRM comercial general, filtros, export y señales de logística leña | Actualizar CRM con marcadores para todos los servicios; detectar oportunidades por actividad reciente y estado de lead |
-| `/clientes/[tel]` | `clientes`, `consultasLena` | Editar ficha comercial; bloque separado de logística leña | Usar datos de zona, dirección, intereses, estado comercial y próximo contacto |
+| `/clientes` | `clientes`, `consultasLena` | CRM comercial general, identidad legible, filtros, export y señales de logística leña | Actualizar identidad (`nombre`/`pushName`/`telefono`), CRM con marcadores para todos los servicios y oportunidades por actividad reciente |
+| `/clientes/[tel]` | `clientes`, `consultasLena` | Editar ficha comercial; ver identidad WhatsApp; bloque separado de logística leña | Usar datos de identidad, zona, dirección, intereses, estado comercial y próximo contacto |
 | `/agenda-entregas` | `entregas_agenda`, `mensajes_programados`, `datos_entrega_cliente`, `colaLena` | Crear/editar entregas y recordatorios | Emitir `[ENTREGA:...]`, `[AGENDAR:...]`, avisos al grupo |
 | `/cola-lena` | `colaLena`, `config/general` | Ver pedidos confirmados chicos | Sincronizar cola operativa y estados de despacho |
 | `/logistica-zonas` | `consultasLena`, `mensajes_programados`, `config/general` | Agrupar consultas por zona y enviar campañas | Usar interés pendiente por zona y programar WhatsApp |

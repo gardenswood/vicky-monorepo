@@ -21,12 +21,19 @@ import {
   ESTADO_COLORS,
   ESTADO_LABELS,
   cn,
+  getDisplayName,
+  getDisplayPhone,
+  getIdentitySecondary,
+  getTelFromJid,
 } from '@/lib/utils'
 import Link from 'next/link'
 
 interface Cliente {
   tel: string
   remoteJid: string
+  telefono?: string
+  pushName?: string
+  whatsappLid?: string
   nombre?: string
   zona?: string
   metodoPago?: string
@@ -157,6 +164,9 @@ export default function ClientesPage() {
         return {
           tel: doc.id,
           remoteJid: d.remoteJid || `${doc.id}@s.whatsapp.net`,
+          telefono: d.telefono,
+          pushName: d.pushName,
+          whatsappLid: d.whatsappLid,
           nombre: d.nombre,
           zona: d.zona,
           metodoPago: d.metodoPago,
@@ -190,7 +200,7 @@ export default function ClientesPage() {
           const remoteJid = String(d.remoteJid ?? '')
           return {
             id: docSnap.id,
-            tel: String(d.tel ?? remoteJid.replace('@s.whatsapp.net', '')),
+            tel: String(d.tel ?? getTelFromJid(remoteJid)),
             remoteJid,
             nombre: String(d.nombre ?? ''),
             zona: String(d.zona ?? 'Sin zona'),
@@ -206,7 +216,7 @@ export default function ClientesPage() {
   const consultasByTel = useMemo(() => {
     const map = new Map<string, ConsultaLenaActiva[]>()
     consultasLena.forEach((consulta) => {
-      const keys = [consulta.tel, consulta.remoteJid.replace('@s.whatsapp.net', '')].filter(Boolean)
+      const keys = [consulta.tel, getTelFromJid(consulta.remoteJid)].filter(Boolean)
       keys.forEach((key) => map.set(key, [...(map.get(key) ?? []), consulta]))
     })
     return map
@@ -227,8 +237,14 @@ export default function ClientesPage() {
       const s = search.toLowerCase()
       result = result.filter(
         (c) =>
-          c.nombre?.toLowerCase().includes(s) ||
+          getDisplayName(c).toLowerCase().includes(s) ||
           c.tel.includes(s) ||
+          c.telefono?.includes(s) ||
+          c.pushName?.toLowerCase().includes(s) ||
+          c.remoteJid?.toLowerCase().includes(s) ||
+          c.whatsappLid?.includes(s) ||
+          getDisplayPhone(c).includes(s) ||
+          getIdentitySecondary(c).toLowerCase().includes(s) ||
           c.zona?.toLowerCase().includes(s) ||
           c.servicioPendiente?.toLowerCase().includes(s) ||
           c.statusCrm?.toLowerCase().includes(s) ||
@@ -239,7 +255,12 @@ export default function ClientesPage() {
     if (servicioFilter !== 'todos') result = result.filter((c) => clienteTieneServicio(c, servicioFilter))
     if (potencialFilter !== 'todos') result = result.filter((c) => normalizePotencial(c.potencial) === potencialFilter)
     if (statusCrmFilter !== 'todos') result = result.filter((c) => c.statusCrm === statusCrmFilter)
-    if (soloLenaActiva) result = result.filter((c) => (consultasByTel.get(c.tel)?.length ?? 0) > 0)
+    if (soloLenaActiva) {
+      result = result.filter((c) => {
+        const phone = getDisplayPhone(c)
+        return (consultasByTel.get(c.tel)?.length ?? 0) > 0 || (phone ? (consultasByTel.get(phone)?.length ?? 0) > 0 : false)
+      })
+    }
     if (soloVencidos) result = result.filter((c) => !!c.proximoContactoAt && c.proximoContactoAt < todayStart)
     result.sort((a, b) => {
       if (orden === 'estado_lead') {
@@ -260,10 +281,11 @@ export default function ClientesPage() {
   }
 
   function exportCSV() {
-    const headers = ['Teléfono', 'Nombre', 'Zona', 'Estado lead', 'Servicio principal', 'Potencial', 'CRM', 'Intereses', 'Próximo contacto', 'Último contacto', 'Pedidos', 'Logística leña activa']
+    const headers = ['Teléfono', 'Nombre', 'Identificador técnico', 'Zona', 'Estado lead', 'Servicio principal', 'Potencial', 'CRM', 'Intereses', 'Próximo contacto', 'Último contacto', 'Pedidos', 'Logística leña activa']
     const rows = filtered.map((c) => [
-      c.tel,
-      c.nombre ?? '',
+      getDisplayPhone(c) || '',
+      getDisplayName(c),
+      getIdentitySecondary(c),
       c.zona ?? '',
       ESTADO_LABELS[c.estado ?? ''] ?? c.estado ?? '',
       SERVICIO_LABELS[servicioPrincipal(c) ?? ''] ?? servicioPrincipal(c) ?? '',
@@ -273,7 +295,7 @@ export default function ClientesPage() {
       c.proximoContactoAt?.toLocaleDateString('es') ?? '',
       c.fechaUltimoContacto?.toLocaleDateString('es') ?? '',
       (c.pedidosAnteriores?.length ?? 0).toString(),
-      (consultasByTel.get(c.tel)?.length ?? 0).toString(),
+      ((consultasByTel.get(c.tel)?.length ?? 0) || (getDisplayPhone(c) ? (consultasByTel.get(getDisplayPhone(c))?.length ?? 0) : 0)).toString(),
     ])
     const csv = [headers, ...rows].map((r) => r.map((v) => `"${v}"`).join(',')).join('\n')
     const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' })
@@ -436,26 +458,32 @@ export default function ClientesPage() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filtered.map((cliente) => {
-                const consultasCliente = consultasByTel.get(cliente.tel) ?? []
+                const telefonoVisible = getDisplayPhone(cliente)
+                const consultasCliente = consultasByTel.get(cliente.tel) ?? (telefonoVisible ? consultasByTel.get(telefonoVisible) : undefined) ?? []
                 const vencido = cliente.proximoContactoAt && cliente.proximoContactoAt < todayStart
                 const servicio = servicioPrincipal(cliente)
+                const nombreVisible = getDisplayName(cliente)
+                const identidadSecundaria = getIdentitySecondary(cliente)
                 return (
                 <tr key={cliente.tel} className="group hover:bg-slate-50 transition-colors">
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-3">
                       <div className="w-9 h-9 rounded-full bg-brand-100 flex items-center justify-center flex-shrink-0">
                         <span className="text-brand-700 text-sm font-semibold">
-                          {getInitials(cliente.nombre)}
+                          {getInitials(nombreVisible)}
                         </span>
                       </div>
                       <div>
                         <p className="text-sm font-medium text-slate-900">
-                          {cliente.nombre || 'Sin nombre'}
+                          {nombreVisible}
                         </p>
                         <p className="text-xs text-slate-500 flex items-center gap-1">
                           <Phone className="w-3 h-3" />
-                          {cliente.tel}
+                          {telefonoVisible || identidadSecundaria}
                         </p>
+                        {telefonoVisible && identidadSecundaria && identidadSecundaria !== telefonoVisible && (
+                          <p className="text-[11px] text-slate-400 truncate max-w-52">{identidadSecundaria}</p>
+                        )}
                       </div>
                     </div>
                   </td>

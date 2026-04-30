@@ -11,12 +11,24 @@ import {
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { SERVICIO_LABELS, ESTADO_COLORS, ESTADO_LABELS, cn, formatRelative } from '@/lib/utils'
+import {
+  SERVICIO_LABELS,
+  ESTADO_COLORS,
+  ESTADO_LABELS,
+  cn,
+  formatRelative,
+  getDisplayName,
+  getDisplayPhone,
+  getIdentitySecondary,
+} from '@/lib/utils'
 import Link from 'next/link'
 
 interface Cliente {
   tel: string
   remoteJid: string
+  telefono?: string
+  pushName?: string
+  whatsappLid?: string
   nombre?: string
   direccion?: string
   zona?: string
@@ -82,6 +94,9 @@ export default function ClienteDetailPage() {
         const c: Cliente = {
           tel: telDecoded,
           remoteJid: d.remoteJid || `${telDecoded}@s.whatsapp.net`,
+          telefono: d.telefono,
+          pushName: d.pushName,
+          whatsappLid: d.whatsappLid,
           nombre: d.nombre,
           direccion: d.direccion,
           zona: d.zona,
@@ -173,7 +188,7 @@ export default function ClienteDetailPage() {
       await addDoc(collection(db, 'consultasLena'), {
         remoteJid: cliente.remoteJid || `${cliente.tel}@s.whatsapp.net`,
         tel: cliente.tel,
-        nombre: cliente.nombre || 'Sin nombre',
+        nombre: getDisplayName(cliente),
         zona: consultaForm.zona.trim(),
         cantidadKg: Math.round(kg),
         notas: consultaForm.notas.trim() || null,
@@ -206,6 +221,11 @@ export default function ClienteDetailPage() {
     )
   }
 
+  const nombreVisible = getDisplayName(cliente)
+  const telefonoVisible = getDisplayPhone(cliente)
+  const identidadSecundaria = getIdentitySecondary(cliente)
+  const whatsappHref = telefonoVisible ? `https://wa.me/${telefonoVisible}` : null
+
   return (
     <div className="p-8 max-w-4xl">
       {/* Header */}
@@ -215,7 +235,7 @@ export default function ClienteDetailPage() {
         </button>
         <div className="w-12 h-12 rounded-full bg-brand-100 flex items-center justify-center">
           <span className="text-brand-700 text-lg font-bold">
-            {cliente.nombre?.[0]?.toUpperCase() ?? '?'}
+            {nombreVisible[0]?.toUpperCase() ?? '?'}
           </span>
         </div>
         <div className="flex-1">
@@ -229,12 +249,12 @@ export default function ClienteDetailPage() {
             />
           ) : (
             <h1 className="text-2xl font-bold text-slate-900">
-              {cliente.nombre || 'Sin nombre'}
+              {nombreVisible}
             </h1>
           )}
           <div className="flex items-center gap-3 mt-1">
             <span className="text-slate-500 text-sm flex items-center gap-1">
-              <Phone className="w-3.5 h-3.5" /> {cliente.tel}
+              <Phone className="w-3.5 h-3.5" /> {telefonoVisible || identidadSecundaria}
             </span>
             {cliente.estado && (
               <span className={cn('badge text-xs', ESTADO_COLORS[cliente.estado] ?? 'bg-slate-100 text-slate-600')}>
@@ -250,14 +270,16 @@ export default function ClienteDetailPage() {
           >
             <MessageSquare className="w-4 h-4" /> Ver chat
           </Link>
-          <a
-            href={`https://wa.me/${cliente.tel}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn-secondary flex items-center gap-1.5"
-          >
-            <ExternalLink className="w-4 h-4" /> WhatsApp
-          </a>
+          {whatsappHref && (
+            <a
+              href={whatsappHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-secondary flex items-center gap-1.5"
+            >
+              <ExternalLink className="w-4 h-4" /> WhatsApp
+            </a>
+          )}
           {editing ? (
             <>
               <button onClick={() => setEditing(false)} className="btn-secondary flex items-center gap-1.5">
@@ -494,6 +516,36 @@ export default function ClienteDetailPage() {
 
         {/* Sidebar */}
         <div className="space-y-4">
+          <div className="card p-5">
+            <h3 className="font-semibold text-slate-900 mb-3 text-sm">Identidad WhatsApp</h3>
+            <div className="space-y-3 text-sm">
+              <div>
+                <p className="text-xs text-slate-400">Nombre visible</p>
+                <p className="text-slate-700 font-medium">{nombreVisible}</p>
+              </div>
+              {cliente.pushName && cliente.pushName !== cliente.nombre && (
+                <div>
+                  <p className="text-xs text-slate-400">Nombre WhatsApp / agenda</p>
+                  <p className="text-slate-700">{cliente.pushName}</p>
+                </div>
+              )}
+              <div>
+                <p className="text-xs text-slate-400">Teléfono real</p>
+                <p className="text-slate-700 font-medium">{telefonoVisible || 'Sin teléfono resuelto'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-400">Identificador técnico</p>
+                <p className="text-slate-500 break-all">{identidadSecundaria || '—'}</p>
+              </div>
+              {cliente.whatsappLid && (
+                <div>
+                  <p className="text-xs text-slate-400">WhatsApp LID</p>
+                  <p className="text-slate-500 break-all">{cliente.whatsappLid}</p>
+                </div>
+              )}
+            </div>
+          </div>
+
           <div className="card p-5">
             <h3 className="font-semibold text-slate-900 mb-3 text-sm">Actividad</h3>
             <div className="space-y-3">

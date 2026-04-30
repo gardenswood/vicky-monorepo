@@ -31,7 +31,7 @@ import {
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { cn, SERVICIO_LABELS, ESTADO_LABELS, ESTADO_COLORS, formatRelative } from '@/lib/utils'
+import { cn, SERVICIO_LABELS, ESTADO_LABELS, ESTADO_COLORS, formatRelative, getTelFromJid } from '@/lib/utils'
 
 interface Mensaje {
   id: string
@@ -75,7 +75,7 @@ export default function ChatDetailPage() {
         const d = snap.data()
         setChatInfo({
           jid,
-          tel: d.tel || jid.replace('@s.whatsapp.net', ''),
+          tel: d.tel || getTelFromJid(jid),
           nombre: d.nombre,
           estado: d.estado,
           servicioPendiente: d.servicioPendiente,

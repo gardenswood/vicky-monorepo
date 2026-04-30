@@ -1938,6 +1938,9 @@ function reactivarVickyTrasSalirAdmin(remoteJid) {
 // Mapeo @lid → teléfono real, construido desde contactos sincronizados por Baileys
 // Claves: lid numérico (sin @lid). Valores: teléfono (sin @s.whatsapp.net)
 const lidToPhone = new Map();
+// Nombres observados desde la agenda/perfil de WhatsApp. No crea CRM por sí solo;
+// se usa como fallback cuando ese contacto realmente escribe o ya existe como lead.
+const waContactNameByJid = new Map();
 /** Defaults si no hay `config/general` en Firestore (panel / operación). */
 const COLA_LENA_DEFAULTS = {
     capacidadCamionKg: 1000,
@@ -3329,6 +3332,7 @@ async function syncClienteFirestoreDesdeHistorialLocal(jid) {
             remoteJid: jid,
             telefono: telefonoLineaParaFirestore(jid, clienteSync),
             nombre: clienteSync.nombre || null,
+            pushName: clienteSync.pushName || null,
             direccion: clienteSync.direccion || null,
             zona: clienteSync.zona || null,
             barrio: clienteSync.barrio || null,
@@ -3352,7 +3356,7 @@ async function syncClienteFirestoreDesdeHistorialLocal(jid) {
             instagramUserId: clienteSync.instagramUserId
                 || (esIgDest ? String(docId).replace(/^ig:/, '') : undefined),
     };
-    if (lidDigits) payloadHist.whatsappLid = lidDigits;
+    if (clienteSync.whatsappLid || lidDigits) payloadHist.whatsappLid = clienteSync.whatsappLid || lidDigits;
     await firestoreModule.syncCliente(docId, payloadHist).catch(() => {});
 }
 
@@ -4381,9 +4385,11 @@ function asegurarCliente(remoteJid) {
         clientesHistorial[tel] = {
             audioIntroEnviado: false,
             nombre: null,
+            pushName: null,
             remoteJid,
             // Guardar teléfono legible si es @s.whatsapp.net, sino el ID @lid limpio
             telefono: remoteJid.includes('@s.whatsapp.net') ? tel : null,
+            whatsappLid: remoteJid.endsWith('@lid') ? tel : null,
             canal: esIg ? 'instagram' : undefined,
             instagramUserId: esIg ? tel.replace(/^ig:/, '') : undefined,
             estado: 'nuevo',
@@ -4406,6 +4412,10 @@ function asegurarCliente(remoteJid) {
     } else {
         // Asegurar que tenga los campos nuevos si era un registro viejo
         if (!clientesHistorial[tel].remoteJid) clientesHistorial[tel].remoteJid = remoteJid;
+        if (clientesHistorial[tel].pushName === undefined) clientesHistorial[tel].pushName = null;
+        if (remoteJid.endsWith('@lid') && !clientesHistorial[tel].whatsappLid) {
+            clientesHistorial[tel].whatsappLid = tel;
+        }
         if (!clientesHistorial[tel].estado) clientesHistorial[tel].estado = 'nuevo';
         if (clientesHistorial[tel].seguimientoEnviado === undefined) clientesHistorial[tel].seguimientoEnviado = false;
         if (clientesHistorial[tel].handoffEnviado === undefined) clientesHistorial[tel].handoffEnviado = false;
@@ -4452,6 +4462,21 @@ function actualizarEstadoCliente(remoteJid, datos) {
     }
 
     saveHistorialGCS().catch(() => {});
+}
+
+function clienteTieneAvanceComercial(cliente) {
+    if (!cliente || typeof cliente !== 'object') return false;
+    if (cliente.estado && cliente.estado !== 'nuevo') return true;
+    return Boolean(
+        cliente.servicioPendiente ||
+        cliente.textoCotizacion ||
+        cliente.statusCrm ||
+        cliente.potencial ||
+        cliente.leadStage ||
+        cliente.handoffEnviado ||
+        cliente.proximoContactoAt ||
+        (Array.isArray(cliente.pedidosAnteriores) && cliente.pedidosAnteriores.length > 0)
+    );
 }
 
 // Construye el contexto previo para inyectar en Gemini cuando el cliente vuelve
@@ -5921,6 +5946,13 @@ async function connectToWhatsApp(isReconnect = false) {
             const lidId = contact.id?.endsWith('@lid')
                 ? contact.id.replace(/@lid$/, '')
                 : (contact.lid ? contact.lid.replace(/@lid$/, '') : null);
+            const nombreContacto = contact.notify || contact.name || null;
+            if (nombreContacto && contact.id) {
+                waContactNameByJid.set(contact.id, nombreContacto);
+            }
+            if (nombreContacto && lidId) {
+                waContactNameByJid.set(`${lidId}@lid`, nombreContacto);
+            }
 
             // ── Mapeo @lid → teléfono ──
             // Caso A: contacto @s.whatsapp.net con campo lid
@@ -5933,6 +5965,8 @@ async function connectToWhatsApp(isReconnect = false) {
                     const c = clientesHistorial[lid];
                     if (c && !c.telefono) {
                         c.telefono = phone;
+                        c.whatsappLid = lid;
+                        if (!c.pushName && nombreContacto) c.pushName = nombreContacto;
                         guardadosPendientes = true;
                         const digits = soloDigitosTel(phone);
                         if (digits.length >= 8) {
@@ -5942,6 +5976,8 @@ async function connectToWhatsApp(isReconnect = false) {
                                     remoteJid: c.remoteJid || `${lid}@lid`,
                                     telefono: digits,
                                     whatsappLid: lid,
+                                    pushName: c.pushName || nombreContacto || null,
+                                    nombre: c.nombre || null,
                                 })
                                 .catch(() => {});
                         }
@@ -5958,6 +5994,8 @@ async function connectToWhatsApp(isReconnect = false) {
                     const c = clientesHistorial[lid];
                     if (c && !c.telefono) {
                         c.telefono = phone;
+                        c.whatsappLid = lid;
+                        if (!c.pushName && nombreContacto) c.pushName = nombreContacto;
                         guardadosPendientes = true;
                         const digits = soloDigitosTel(phone);
                         if (digits.length >= 8) {
@@ -5967,6 +6005,8 @@ async function connectToWhatsApp(isReconnect = false) {
                                     remoteJid: c.remoteJid || `${lid}@lid`,
                                     telefono: digits,
                                     whatsappLid: lid,
+                                    pushName: c.pushName || nombreContacto || null,
+                                    nombre: c.nombre || null,
                                 })
                                 .catch(() => {});
                         }
@@ -5977,13 +6017,15 @@ async function connectToWhatsApp(isReconnect = false) {
             // ── Guardar nombre/pushName para clientes existentes ──
             // contact.notify = pushName (nombre configurado en WhatsApp)
             // contact.name   = nombre guardado en agenda del teléfono del admin
-            const nombreContacto = contact.notify || contact.name || null;
             if (nombreContacto && lidId) {
                 const cliente = clientesHistorial[lidId];
                 if (cliente && !cliente.pushName) {
                     cliente.pushName = nombreContacto;
                     nuevosNombre++;
                     guardadosPendientes = true;
+                    if (clienteTieneAvanceComercial(cliente)) {
+                        syncClienteFirestoreDesdeHistorialLocal(cliente.remoteJid || `${lidId}@lid`).catch(() => {});
+                    }
                 }
             }
         }
@@ -8070,13 +8112,17 @@ Ejemplos de cómo traducir instrucciones:
 
             // --- GUARDAR PUSHNAME (nombre WhatsApp del cliente) ---
             // msg.pushName es el nombre que el cliente tiene configurado en su WhatsApp.
-            // Lo guardamos como fallback para identificar clientes @lid sin teléfono.
-            if (!msg.key.fromMe && msg.pushName) {
+            // Si la agenda local ya tenía un nombre para ese JID, lo usamos como fallback mejor.
+            if (!msg.key.fromMe) {
                 const clientePush = asegurarCliente(remoteJid);
-                if (!clientePush.pushName && msg.pushName) {
-                    clientePush.pushName = msg.pushName;
+                const nombreDetectado = waContactNameByJid.get(remoteJid) || msg.pushName || null;
+                if (!clientePush.pushName && nombreDetectado) {
+                    clientePush.pushName = nombreDetectado;
                     saveHistorialGCS().catch(() => {});
-                    console.log(`📛 pushName guardado para ${remoteJid}: "${msg.pushName}"`);
+                    if (clienteTieneAvanceComercial(clientePush)) {
+                        syncClienteFirestoreDesdeHistorialLocal(remoteJid).catch(() => {});
+                    }
+                    console.log(`📛 pushName guardado para ${remoteJid}: "${nombreDetectado}"`);
                 }
             }
 

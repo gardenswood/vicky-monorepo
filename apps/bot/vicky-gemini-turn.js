@@ -898,6 +898,7 @@ async function ejecutarTurnoVickyGeminiCore(deps, params) {
                     remoteJid,
                     telefono: telefonoLineaParaFirestore(remoteJid, clienteSync),
                     nombre: clienteSync.nombre || null,
+                    pushName: clienteSync.pushName || null,
                     direccion: clienteSync.direccion || null,
                     zona: clienteSync.zona || null,
                     barrio: clienteSync.barrio || null,
@@ -921,7 +922,7 @@ async function ejecutarTurnoVickyGeminiCore(deps, params) {
                     instagramUserId:
                         clienteSync.instagramUserId || (esIg ? String(instagramPsid) : undefined),
                 };
-                if (lidDigits) fsCliente.whatsappLid = lidDigits;
+                if (clienteSync.whatsappLid || lidDigits) fsCliente.whatsappLid = clienteSync.whatsappLid || lidDigits;
                 firestoreModule.syncCliente(docFs, fsCliente).catch(() => {});
             }
         } else if (!audioEnviado) {
