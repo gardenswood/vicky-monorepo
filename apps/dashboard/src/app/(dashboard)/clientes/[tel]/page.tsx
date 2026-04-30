@@ -244,12 +244,6 @@ export default function ClienteDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={openConsultaModal}
-            className="btn-secondary flex items-center gap-1.5"
-          >
-            <Plus className="w-4 h-4" /> Registrar consulta leña
-          </button>
           <Link
             href={`/chats/${encodeURIComponent(cliente.remoteJid)}`}
             className="btn-secondary flex items-center gap-1.5"
@@ -280,18 +274,6 @@ export default function ClienteDetailPage() {
           )}
         </div>
       </div>
-
-      {consultasLena.length > 0 && (
-        <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 flex items-start gap-2">
-          <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-          <div>
-            <p className="font-medium">Consulta de leña activa</p>
-            <p>
-              {consultasLena.reduce((sum, c) => sum + c.cantidadKg, 0)} kg en {consultasLena[0].zona}. Estado zona: {consultasLena[0].estado.replaceAll('_', ' ')}.
-            </p>
-          </div>
-        </div>
-      )}
 
       <div className="grid grid-cols-3 gap-5">
         {/* Main info */}
@@ -543,6 +525,33 @@ export default function ClienteDetailPage() {
               </div>
             ) : (
               <p className="text-slate-400 text-sm">Sin servicio activo</p>
+            )}
+          </div>
+
+          <div className="card p-5 border-amber-100">
+            <h3 className="font-semibold text-slate-900 mb-3 text-sm flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-600" />
+              Logística leña
+            </h3>
+            {consultasLena.length > 0 ? (
+              <div className="space-y-3">
+                <div className="rounded-lg bg-amber-50 border border-amber-100 p-3 text-sm text-amber-800">
+                  <p className="font-medium">Consulta activa de reparto</p>
+                  <p className="text-xs mt-1">
+                    {consultasLena.reduce((sum, c) => sum + c.cantidadKg, 0)} kg en {consultasLena[0].zona}. Estado: {consultasLena[0].estado.replaceAll('_', ' ')}.
+                  </p>
+                </div>
+                <Link href="/logistica-zonas" className="btn-secondary w-full justify-center flex items-center gap-1.5">
+                  Ver reparto de leña
+                </Link>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-slate-400 text-sm">Sin consulta logística de leña activa.</p>
+                <button onClick={openConsultaModal} className="btn-secondary w-full flex items-center justify-center gap-1.5">
+                  <Plus className="w-4 h-4" /> Registrar para reparto
+                </button>
+              </div>
             )}
           </div>
 

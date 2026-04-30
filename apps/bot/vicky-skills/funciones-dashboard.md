@@ -15,9 +15,10 @@ Usar las funciones operativas del dashboard como herramientas de gestión comerc
 ### Clientes CRM
 
 - Fuente: `clientes/{tel}`.
-- Usos: nombre, zona, dirección, intereses, urgencia, potencial, estado CRM, servicio pendiente y próximo contacto.
-- Acción: completar datos con marcadores CRM cuando el cliente los da naturalmente.
-- Regla operativa: el dashboard **CRM Ventas** prioriza tareas vencidas, leads calientes, seguimientos y cotizaciones. Vicky debe dejar `proximoContactoAt` cuando haya que volver a escribir.
+- Usos: nombre, zona, dirección, intereses, urgencia, potencial, estado CRM, servicio pendiente y próximo contacto para todos los productos/servicios activos.
+- Acción: completar datos con marcadores CRM cuando el cliente los da naturalmente; usar intereses normalizados (`lena`, `cerco`, `pergola`, `fogonero`, `bancos`, `madera`) para que el panel filtre bien.
+- Regla operativa: el dashboard **CRM Ventas** ordena por actividad reciente y permite agrupar por estado de lead. Vicky debe dejar `proximoContactoAt` cuando haya que volver a escribir.
+- Separación: el CRM muestra señales de leña, pero la operación de reparto vive en **Logística leña** (`consultasLena`, `/logistica-zonas`) o **Cola de leña** (`colaLena`).
 
 ### Agenda de entregas
 

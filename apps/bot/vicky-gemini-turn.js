@@ -75,6 +75,48 @@ function normalizarInteresesCrm(value) {
         .filter(Boolean))];
 }
 
+const SERVICIOS_CRM = new Map([
+    ['lena', 'lena'],
+    ['leña', 'lena'],
+    ['cerco', 'cerco'],
+    ['cercos', 'cerco'],
+    ['pergola', 'pergola'],
+    ['pergolas', 'pergola'],
+    ['fogonero', 'fogonero'],
+    ['sector_fogonero', 'fogonero'],
+    ['sector fogonero', 'fogonero'],
+    ['banco', 'bancos'],
+    ['bancos', 'bancos'],
+    ['madera', 'madera'],
+    ['maderas', 'madera'],
+]);
+
+const SERVICIO_PUBLICO = {
+    lena: 'leña',
+    cerco: 'cercos',
+    pergola: 'pérgolas',
+    fogonero: 'sector fogonero',
+    bancos: 'bancos de quebracho',
+    madera: 'productos de madera',
+};
+
+function normalizarServicioCrm(value) {
+    const key = String(value || '')
+        .trim()
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/\p{M}/gu, '');
+    return SERVICIOS_CRM.get(key) || '';
+}
+
+function inferirServicioDesdeIntereses(intereses) {
+    for (const interes of intereses || []) {
+        const servicio = normalizarServicioCrm(interes);
+        if (servicio) return servicio;
+    }
+    return '';
+}
+
 function crmAutoPorLeadStage(stage) {
     if (stage === 'interesado') {
         return {
@@ -299,12 +341,8 @@ async function ejecutarTurnoVickyGeminiCore(deps, params) {
 
         const ctxLeerPrimero =
             '[LECTURA_OBLIGATORIA] Antes de redactar, integrá en orden: (1) [HILO_CHAT_RECIENTE] si aparece abajo, (2) [CONTEXTO_KONTROLPRO] si aparece abajo (datos de oficina: saldos y fechas de trabajos/entregas), (3) [CONTEXTO_HISTORIAL_CONSULTAS] y [CONTEXTO_SISTEMA] si están en el historial del modelo, (4) [LECTURA_CHAT_PREVIO], y (5) el mensaje actual del cliente. Respondé alineado al tema que venían tratando; no reinicies de cero salvo que el cliente cambie de asunto.';
-        const nomServPub =
-            publicidadLead?.servicio === 'lena'
-                ? 'leña'
-                : publicidadLead?.servicio === 'cerco'
-                  ? 'cercos'
-                  : '';
+        const servicioPublicidad = normalizarServicioCrm(publicidadLead?.servicio);
+        const nomServPub = SERVICIO_PUBLICO[servicioPublicidad] || String(publicidadLead?.servicio || 'el producto consultado');
         const ctxPublicidad = publicidadLead
             ? `[CONTEXTO_PUBLICIDAD] El cliente llegó desde publicidad (${publicidadLead.origen}) sobre ${nomServPub}. NO preguntes qué producto le interesa ni enumeres otros servicios. Respondé directo con precios/info del sistema para ${nomServPub}. Si el mensaje es muy vago, pedí UN dato concreto (medidas, cantidad o zona) para ese producto.`
             : '';
@@ -418,7 +456,7 @@ async function ejecutarTurnoVickyGeminiCore(deps, params) {
             session.chatHistory = session.chatHistory.slice(-20);
         }
 
-        const cotizMatch = respuesta.match(/\[COTIZACION:(lena|cerco|pergola|fogonero|bancos)\]/i);
+        const cotizMatch = respuesta.match(/\[COTIZACION:(lena|cerco|pergola|fogonero|bancos|madera)\]/i);
         const huboCotizacionMarcador = !!cotizMatch;
         if (cotizMatch) {
             const srv = cotizMatch[1].toLowerCase();
@@ -633,11 +671,14 @@ async function ejecutarTurnoVickyGeminiCore(deps, params) {
             const zonaCrm = p[3] || '';
             const interCsv = p[4] || '';
             const upd = {};
+            const intereses = interCsv ? normalizarInteresesCrm(interCsv) : [];
+            const servicioCrm = inferirServicioDesdeIntereses(intereses);
             if (pot) upd.potencial = pot;
             if (['pendiente_cotizacion', 'seguimiento', 'concreto', 'en_obra'].includes(st)) upd.statusCrm = st;
             if (['alta', 'media', 'baja'].includes(urg)) upd.urgencia = urg;
             if (zonaCrm) upd.zona = zonaCrm;
-            if (interCsv) upd.interes = normalizarInteresesCrm(interCsv);
+            if (intereses.length) upd.interes = intereses;
+            if (servicioCrm && !getCliente(remoteJid)?.servicioPendiente) upd.servicioPendiente = servicioCrm;
             if (Object.keys(upd).length) actualizarEstadoCliente(remoteJid, upd);
             respuesta = respuesta.replace(/\[CRM:[^\]]+\]/gi, '').trim();
         }

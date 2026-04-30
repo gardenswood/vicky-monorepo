@@ -1,8 +1,8 @@
 'use client'
 export const dynamic = 'force-dynamic'
 
-import { Fragment, useEffect, useMemo, useState } from 'react'
-import { addDoc, collection, query, orderBy, onSnapshot, where, serverTimestamp } from 'firebase/firestore'
+import { useEffect, useMemo, useState } from 'react'
+import { collection, query, orderBy, onSnapshot, where } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import {
   Search,
@@ -13,7 +13,6 @@ import {
   Package,
   Clock,
   Phone,
-  Plus,
 } from 'lucide-react'
 import {
   formatRelative,
@@ -57,6 +56,42 @@ const ESTADOS = ['todos', 'nuevo', 'cotizacion_enviada', 'confirmado', 'cliente'
 const SERVICIOS = ['todos', 'lena', 'cerco', 'pergola', 'fogonero', 'bancos', 'madera']
 const POTENCIALES = ['todos', 'frio', 'tibio', 'caliente']
 const STATUS_CRM = ['todos', 'pendiente_cotizacion', 'seguimiento', 'concreto', 'en_obra']
+const ORDENES = ['recientes', 'estado_lead'] as const
+
+const STATUS_CRM_LABELS: Record<string, string> = {
+  pendiente_cotizacion: 'Pendiente cotización',
+  seguimiento: 'Seguimiento',
+  concreto: 'Concreto',
+  en_obra: 'En obra',
+}
+
+const STATUS_CRM_COLORS: Record<string, string> = {
+  pendiente_cotizacion: 'bg-blue-50 text-blue-700',
+  seguimiento: 'bg-amber-50 text-amber-700',
+  concreto: 'bg-green-50 text-green-700',
+  en_obra: 'bg-purple-50 text-purple-700',
+}
+
+const STATUS_CRM_ORDER: Record<string, number> = {
+  pendiente_cotizacion: 0,
+  seguimiento: 1,
+  concreto: 2,
+  en_obra: 3,
+}
+
+const SERVICIO_ALIASES: Record<string, string> = {
+  lena: 'lena',
+  leña: 'lena',
+  cerco: 'cerco',
+  cercos: 'cerco',
+  pergola: 'pergola',
+  pergolas: 'pergola',
+  fogonero: 'fogonero',
+  bancos: 'bancos',
+  banco: 'bancos',
+  madera: 'madera',
+  maderas: 'madera',
+}
 
 function normalizePotencial(value?: string): string {
   return (value ?? '')
@@ -77,6 +112,29 @@ function optionalDate(value: unknown): Date | undefined {
   return undefined
 }
 
+function crmLabel(value?: string): string {
+  if (!value) return 'Sin estado CRM'
+  return STATUS_CRM_LABELS[value] ?? value.replaceAll('_', ' ')
+}
+
+function normalizeServicio(value?: string): string {
+  const normalized = (value ?? '').trim().toLowerCase().normalize('NFD').replace(/\p{M}/gu, '')
+  return SERVICIO_ALIASES[normalized] ?? normalized
+}
+
+function servicioPrincipal(cliente: Cliente): string | undefined {
+  const servicio = normalizeServicio(cliente.servicioPendiente || cliente.interes?.[0])
+  return servicio || undefined
+}
+
+function clienteTieneServicio(cliente: Cliente, servicio: string): boolean {
+  return normalizeServicio(cliente.servicioPendiente) === servicio || !!cliente.interes?.some((i) => normalizeServicio(i) === servicio)
+}
+
+function statusRank(value?: string): number {
+  return STATUS_CRM_ORDER[value ?? ''] ?? 99
+}
+
 export default function ClientesPage() {
   const [clientes, setClientes] = useState<Cliente[]>([])
   const [filtered, setFiltered] = useState<Cliente[]>([])
@@ -85,12 +143,10 @@ export default function ClientesPage() {
   const [servicioFilter, setServicioFilter] = useState('todos')
   const [potencialFilter, setPotencialFilter] = useState('todos')
   const [statusCrmFilter, setStatusCrmFilter] = useState('todos')
+  const [orden, setOrden] = useState<(typeof ORDENES)[number]>('recientes')
   const [soloLenaActiva, setSoloLenaActiva] = useState(false)
   const [soloVencidos, setSoloVencidos] = useState(false)
   const [consultasLena, setConsultasLena] = useState<ConsultaLenaActiva[]>([])
-  const [quickTel, setQuickTel] = useState<string | null>(null)
-  const [quickForm, setQuickForm] = useState({ cantidadKg: '', zona: '', notas: '' })
-  const [quickSaving, setQuickSaving] = useState(false)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -164,20 +220,6 @@ export default function ClientesPage() {
 
   const seguimientosVencidos = clientes.filter((c) => c.proximoContactoAt && c.proximoContactoAt < todayStart).length
   const clientesConConsultaLena = new Set(consultasLena.map((c) => c.tel)).size
-  const consultasLenaPotenciales = clientes.filter(
-    (c) => c.interes?.some((i) => i.toLowerCase().includes('lena') || i.toLowerCase().includes('leña')) && c.estado !== 'confirmado'
-  ).length
-
-  function leadPriority(cliente: Cliente): number {
-    const potencial = normalizePotencial(cliente.potencial)
-    let score = 0
-    if (cliente.proximoContactoAt && cliente.proximoContactoAt < todayStart) score += 100
-    if (cliente.statusCrm === 'seguimiento') score += 30
-    if (potencial === 'caliente') score += 25
-    if (cliente.urgencia === 'alta') score += 20
-    if (cliente.estado === 'cotizacion_enviada') score += 10
-    return score
-  }
 
   useEffect(() => {
     let result = [...clientes]
@@ -188,22 +230,26 @@ export default function ClientesPage() {
           c.nombre?.toLowerCase().includes(s) ||
           c.tel.includes(s) ||
           c.zona?.toLowerCase().includes(s) ||
+          c.servicioPendiente?.toLowerCase().includes(s) ||
+          c.statusCrm?.toLowerCase().includes(s) ||
           c.interes?.some((i) => i.toLowerCase().includes(s))
       )
     }
     if (estadoFilter !== 'todos') result = result.filter((c) => c.estado === estadoFilter)
-    if (servicioFilter !== 'todos') result = result.filter((c) => c.servicioPendiente === servicioFilter)
+    if (servicioFilter !== 'todos') result = result.filter((c) => clienteTieneServicio(c, servicioFilter))
     if (potencialFilter !== 'todos') result = result.filter((c) => normalizePotencial(c.potencial) === potencialFilter)
     if (statusCrmFilter !== 'todos') result = result.filter((c) => c.statusCrm === statusCrmFilter)
     if (soloLenaActiva) result = result.filter((c) => (consultasByTel.get(c.tel)?.length ?? 0) > 0)
     if (soloVencidos) result = result.filter((c) => !!c.proximoContactoAt && c.proximoContactoAt < todayStart)
     result.sort((a, b) => {
-      const priorityDiff = leadPriority(b) - leadPriority(a)
-      if (priorityDiff !== 0) return priorityDiff
+      if (orden === 'estado_lead') {
+        const statusDiff = statusRank(a.statusCrm) - statusRank(b.statusCrm)
+        if (statusDiff !== 0) return statusDiff
+      }
       return (b.fechaUltimoContacto?.getTime() ?? 0) - (a.fechaUltimoContacto?.getTime() ?? 0)
     })
     setFiltered(result)
-  }, [clientes, search, estadoFilter, servicioFilter, potencialFilter, statusCrmFilter, soloLenaActiva, soloVencidos, consultasByTel, todayStart])
+  }, [clientes, search, estadoFilter, servicioFilter, potencialFilter, statusCrmFilter, orden, soloLenaActiva, soloVencidos, consultasByTel, todayStart])
 
   function potencialClass(potencial?: string) {
     const normalized = normalizePotencial(potencial)
@@ -213,51 +259,21 @@ export default function ClientesPage() {
     return 'bg-slate-100 text-slate-600'
   }
 
-  function openQuickConsulta(cliente: Cliente) {
-    setQuickTel(cliente.tel)
-    setQuickForm({ cantidadKg: '', zona: cliente.zona ?? '', notas: '' })
-  }
-
-  async function saveQuickConsulta(cliente: Cliente) {
-    const kg = Number(quickForm.cantidadKg)
-    if (!Number.isFinite(kg) || kg < 1 || kg > 499 || !quickForm.zona.trim()) return
-    setQuickSaving(true)
-    try {
-      await addDoc(collection(db, 'consultasLena'), {
-        remoteJid: cliente.remoteJid || `${cliente.tel}@s.whatsapp.net`,
-        tel: cliente.tel,
-        nombre: cliente.nombre || 'Sin nombre',
-        zona: quickForm.zona.trim(),
-        cantidadKg: Math.round(kg),
-        notas: quickForm.notas.trim() || null,
-        fechaConsulta: serverTimestamp(),
-        estado: 'pendiente',
-        origen: 'dashboard_clientes',
-        creadoEn: serverTimestamp(),
-        actualizadoEn: serverTimestamp(),
-      })
-      setQuickTel(null)
-      setQuickForm({ cantidadKg: '', zona: '', notas: '' })
-    } finally {
-      setQuickSaving(false)
-    }
-  }
-
   function exportCSV() {
-    const headers = ['Teléfono', 'Nombre', 'Zona', 'Estado', 'Servicio', 'Potencial', 'CRM', 'Intereses', 'Próximo contacto', 'Pago', 'Último contacto', 'Pedidos']
+    const headers = ['Teléfono', 'Nombre', 'Zona', 'Estado lead', 'Servicio principal', 'Potencial', 'CRM', 'Intereses', 'Próximo contacto', 'Último contacto', 'Pedidos', 'Logística leña activa']
     const rows = filtered.map((c) => [
       c.tel,
       c.nombre ?? '',
       c.zona ?? '',
       ESTADO_LABELS[c.estado ?? ''] ?? c.estado ?? '',
-      SERVICIO_LABELS[c.servicioPendiente ?? ''] ?? c.servicioPendiente ?? '',
+      SERVICIO_LABELS[servicioPrincipal(c) ?? ''] ?? servicioPrincipal(c) ?? '',
       c.potencial ?? '',
       c.statusCrm ?? '',
       c.interes?.join('|') ?? '',
       c.proximoContactoAt?.toLocaleDateString('es') ?? '',
-      c.metodoPago ?? '',
       c.fechaUltimoContacto?.toLocaleDateString('es') ?? '',
       (c.pedidosAnteriores?.length ?? 0).toString(),
+      (consultasByTel.get(c.tel)?.length ?? 0).toString(),
     ])
     const csv = [headers, ...rows].map((r) => r.map((v) => `"${v}"`).join(',')).join('\n')
     const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' })
@@ -290,11 +306,11 @@ export default function ClientesPage() {
         {[
           { label: 'Nuevos', count: clientes.filter((c) => !c.estado || c.estado === 'nuevo').length, color: 'bg-slate-100 text-slate-600' },
           { label: 'Con cotización', count: clientes.filter((c) => c.estado === 'cotizacion_enviada').length, color: 'bg-blue-100 text-blue-700' },
-          { label: 'Confirmados', count: clientes.filter((c) => c.estado === 'confirmado').length, color: 'bg-green-100 text-green-700' },
-          { label: 'Clientes', count: clientes.filter((c) => c.estado === 'cliente').length, color: 'bg-brand-100 text-brand-700' },
+          { label: 'Calientes', count: clientes.filter((c) => normalizePotencial(c.potencial) === 'caliente').length, color: 'bg-orange-100 text-orange-700' },
           { label: 'Seguimiento', count: clientes.filter((c) => c.statusCrm === 'seguimiento').length, color: 'bg-amber-100 text-amber-700' },
+          { label: 'Concretos', count: clientes.filter((c) => c.statusCrm === 'concreto').length, color: 'bg-green-100 text-green-700' },
+          { label: 'En obra', count: clientes.filter((c) => c.statusCrm === 'en_obra').length, color: 'bg-purple-100 text-purple-700' },
           { label: 'Vencidos', count: seguimientosVencidos, color: 'bg-red-100 text-red-700' },
-          { label: 'Consultas leña', count: consultasLenaPotenciales, color: 'bg-amber-100 text-amber-700' },
         ].map((s) => (
           <div key={s.label} className="card p-4 flex items-center gap-3">
             <span className={`badge text-sm px-2.5 py-1 ${s.color}`}>{s.label}</span>
@@ -345,6 +361,13 @@ export default function ClientesPage() {
               </option>
             ))}
           </select>
+          <select className="input" value={orden} onChange={(e) => setOrden(e.target.value as (typeof ORDENES)[number])}>
+            {ORDENES.map((o) => (
+              <option key={o} value={o}>
+                {o === 'recientes' ? 'Más recientes primero' : 'Agrupar por estado lead'}
+              </option>
+            ))}
+          </select>
         </div>
         <button
           type="button"
@@ -368,8 +391,11 @@ export default function ClientesPage() {
               : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
           )}
         >
-          Con consulta leña activa ({clientesConConsultaLena})
+          Señal logística leña ({clientesConConsultaLena})
         </button>
+        <Link href="/logistica-zonas" className="badge px-3 py-2 border bg-white text-amber-700 border-amber-200 hover:bg-amber-50">
+          Ver reparto de leña
+        </Link>
       </div>
 
       {/* Clients table */}
@@ -399,11 +425,10 @@ export default function ClientesPage() {
               <tr className="bg-slate-50 border-b border-slate-200">
                 <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-5 py-3">Cliente</th>
                 <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-3 py-3">Zona</th>
-                <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-3 py-3">Estado</th>
-                <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-3 py-3">Servicio</th>
-                <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-3 py-3">CRM</th>
-                <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-3 py-3">Leña</th>
-                <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-3 py-3">Pago</th>
+                <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-3 py-3">Estado lead</th>
+                <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-3 py-3">Servicio / interés</th>
+                <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-3 py-3">CRM comercial</th>
+                <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-3 py-3">Próximo contacto</th>
                 <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-3 py-3">Pedidos</th>
                 <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-3 py-3">Último contacto</th>
                 <th className="px-3 py-3" />
@@ -412,11 +437,10 @@ export default function ClientesPage() {
             <tbody className="divide-y divide-slate-100">
               {filtered.map((cliente) => {
                 const consultasCliente = consultasByTel.get(cliente.tel) ?? []
-                const consultaPrincipal = consultasCliente[0]
                 const vencido = cliente.proximoContactoAt && cliente.proximoContactoAt < todayStart
+                const servicio = servicioPrincipal(cliente)
                 return (
-                <Fragment key={cliente.tel}>
-                <tr className="group hover:bg-slate-50 transition-colors">
+                <tr key={cliente.tel} className="group hover:bg-slate-50 transition-colors">
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-3">
                       <div className="w-9 h-9 rounded-full bg-brand-100 flex items-center justify-center flex-shrink-0">
@@ -451,44 +475,44 @@ export default function ClientesPage() {
                     )}
                   </td>
                   <td className="px-3 py-4">
-                    {cliente.servicioPendiente ? (
-                      <span className="text-sm text-slate-700">
-                        {SERVICIO_LABELS[cliente.servicioPendiente] ?? cliente.servicioPendiente}
-                      </span>
-                    ) : (
-                      <span className="text-slate-300 text-sm">—</span>
-                    )}
-                  </td>
-                  <td className="px-3 py-4">
                     <div className="space-y-1">
-                      {cliente.potencial && (
-                        <span className={cn('badge text-xs', potencialClass(cliente.potencial))}>{cliente.potencial}</span>
-                      )}
-                      {cliente.statusCrm && (
-                        <p className="text-xs text-slate-500">{cliente.statusCrm.replaceAll('_', ' ')}</p>
-                      )}
-                      {vencido && (
-                        <span className="badge text-xs bg-red-100 text-red-700">Vencido</span>
+                      {servicio ? (
+                        <span className="text-sm text-slate-700">
+                          {SERVICIO_LABELS[servicio] ?? servicio}
+                        </span>
+                      ) : (
+                        <span className="text-slate-300 text-sm">—</span>
                       )}
                       {cliente.interes && cliente.interes.length > 0 && (
-                        <p className="text-xs text-slate-400">{cliente.interes.slice(0, 2).join(', ')}</p>
+                        <p className="text-xs text-slate-400">{cliente.interes.slice(0, 3).join(', ')}</p>
+                      )}
+                      {consultasCliente.length > 0 && (
+                        <Link href="/logistica-zonas" className="text-xs text-amber-700 hover:text-amber-800">
+                          Logística leña activa ({consultasCliente.length})
+                        </Link>
                       )}
                     </div>
                   </td>
                   <td className="px-3 py-4">
-                    {consultaPrincipal ? (
-                      <div className="space-y-1">
-                        <span className="badge text-xs bg-amber-100 text-amber-700">
-                          Leña {consultaPrincipal.zona} · {consultasCliente.reduce((sum, c) => sum + c.cantidadKg, 0)}kg
+                    <div className="space-y-1">
+                      {cliente.statusCrm && (
+                        <span className={cn('badge text-xs', STATUS_CRM_COLORS[cliente.statusCrm] ?? 'bg-slate-100 text-slate-600')}>
+                          {crmLabel(cliente.statusCrm)}
                         </span>
-                        {consultasCliente.length > 1 && <p className="text-xs text-slate-400">{consultasCliente.length} consultas</p>}
-                      </div>
-                    ) : (
-                      <span className="text-slate-300 text-sm">—</span>
-                    )}
+                      )}
+                      {cliente.potencial && (
+                        <span className={cn('badge text-xs', potencialClass(cliente.potencial))}>{cliente.potencial}</span>
+                      )}
+                      {vencido && (
+                        <span className="badge text-xs bg-red-100 text-red-700">Vencido</span>
+                      )}
+                    </div>
                   </td>
-                  <td className="px-3 py-4 text-sm text-slate-600 capitalize">
-                    {cliente.metodoPago || <span className="text-slate-300">—</span>}
+                  <td className="px-3 py-4">
+                    <div className="flex items-center gap-1 text-xs text-slate-500">
+                      <Clock className="w-3 h-3" />
+                      {cliente.proximoContactoAt ? formatRelative(cliente.proximoContactoAt) : <span className="text-slate-300">—</span>}
+                    </div>
                   </td>
                   <td className="px-3 py-4">
                     <div className="flex items-center gap-1 text-sm text-slate-700">
@@ -504,13 +528,6 @@ export default function ClientesPage() {
                   </td>
                   <td className="px-3 py-4">
                     <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => openQuickConsulta(cliente)}
-                        className="opacity-0 group-hover:opacity-100 text-xs text-amber-700 hover:text-amber-800 font-medium flex items-center gap-1 transition-opacity"
-                      >
-                        <Plus className="w-3 h-3" />
-                        Consulta
-                      </button>
                       <Link
                         href={`/clientes/${encodeURIComponent(cliente.tel)}`}
                         className="text-xs text-brand-600 hover:text-brand-700 font-medium"
@@ -520,46 +537,6 @@ export default function ClientesPage() {
                     </div>
                   </td>
                 </tr>
-                {quickTel === cliente.tel && (
-                  <tr>
-                    <td colSpan={10} className="px-5 py-4 bg-amber-50/60">
-                      <div className="flex flex-wrap items-end gap-3">
-                        <div>
-                          <label className="label">Kg</label>
-                          <input
-                            type="number"
-                            min={1}
-                            max={499}
-                            className="input w-28"
-                            value={quickForm.cantidadKg}
-                            onChange={(e) => setQuickForm((f) => ({ ...f, cantidadKg: e.target.value }))}
-                          />
-                        </div>
-                        <div>
-                          <label className="label">Zona</label>
-                          <input
-                            className="input w-48"
-                            value={quickForm.zona}
-                            onChange={(e) => setQuickForm((f) => ({ ...f, zona: e.target.value }))}
-                          />
-                        </div>
-                        <div className="flex-1 min-w-48">
-                          <label className="label">Notas</label>
-                          <input
-                            className="input"
-                            value={quickForm.notas}
-                            onChange={(e) => setQuickForm((f) => ({ ...f, notas: e.target.value }))}
-                          />
-                        </div>
-                        <button onClick={() => saveQuickConsulta(cliente)} disabled={quickSaving} className="btn-primary">
-                          {quickSaving ? 'Guardando...' : 'Guardar consulta'}
-                        </button>
-                        <button onClick={() => setQuickTel(null)} className="btn-secondary">Cancelar</button>
-                      </div>
-                    </td>
-                  </tr>
-                )}
-                </Fragment>
                 )
               })}
             </tbody>
