@@ -13,6 +13,7 @@ import {
   Package,
   Clock,
   Phone,
+  Maximize2,
 } from 'lucide-react'
 import {
   formatRelative,
@@ -27,6 +28,7 @@ import {
   getTelFromJid,
 } from '@/lib/utils'
 import Link from 'next/link'
+import ClienteDetailModal from '@/components/clientes/ClienteDetailModal'
 
 interface Cliente {
   tel: string
@@ -62,7 +64,7 @@ interface ConsultaLenaActiva {
 const ESTADOS = ['todos', 'nuevo', 'cotizacion_enviada', 'confirmado', 'cliente']
 const SERVICIOS = ['todos', 'lena', 'cerco', 'pergola', 'fogonero', 'bancos', 'madera']
 const POTENCIALES = ['todos', 'frio', 'tibio', 'caliente']
-const STATUS_CRM = ['todos', 'pendiente_cotizacion', 'seguimiento', 'concreto', 'en_obra']
+const STATUS_CRM = ['todos', 'pendiente_cotizacion', 'seguimiento', 'concreto', 'en_obra', 'perdido', 'desestimado']
 const ORDENES = ['recientes', 'estado_lead'] as const
 
 const STATUS_CRM_LABELS: Record<string, string> = {
@@ -70,6 +72,8 @@ const STATUS_CRM_LABELS: Record<string, string> = {
   seguimiento: 'Seguimiento',
   concreto: 'Concreto',
   en_obra: 'En obra',
+  perdido: 'Perdido',
+  desestimado: 'Desestimado',
 }
 
 const STATUS_CRM_COLORS: Record<string, string> = {
@@ -77,6 +81,8 @@ const STATUS_CRM_COLORS: Record<string, string> = {
   seguimiento: 'bg-amber-50 text-amber-700',
   concreto: 'bg-green-50 text-green-700',
   en_obra: 'bg-purple-50 text-purple-700',
+  perdido: 'bg-red-50 text-red-700 border border-red-200',
+  desestimado: 'bg-slate-200 text-slate-700 border border-slate-300',
 }
 
 const STATUS_CRM_ORDER: Record<string, number> = {
@@ -84,6 +90,8 @@ const STATUS_CRM_ORDER: Record<string, number> = {
   seguimiento: 1,
   concreto: 2,
   en_obra: 3,
+  perdido: 4,
+  desestimado: 5,
 }
 
 const SERVICIO_ALIASES: Record<string, string> = {
@@ -155,6 +163,7 @@ export default function ClientesPage() {
   const [soloVencidos, setSoloVencidos] = useState(false)
   const [consultasLena, setConsultasLena] = useState<ConsultaLenaActiva[]>([])
   const [loading, setLoading] = useState(true)
+  const [selectedClienteTel, setSelectedClienteTel] = useState<string | null>(null)
 
   useEffect(() => {
     const q = query(collection(db, 'clientes'), orderBy('fechaUltimoContacto', 'desc'))
@@ -465,7 +474,11 @@ export default function ClientesPage() {
                 const nombreVisible = getDisplayName(cliente)
                 const identidadSecundaria = getIdentitySecondary(cliente)
                 return (
-                <tr key={cliente.tel} className="group hover:bg-slate-50 transition-colors">
+                <tr
+                  key={cliente.tel}
+                  className="group hover:bg-slate-50 transition-colors cursor-pointer"
+                  onClick={() => setSelectedClienteTel(cliente.tel)}
+                >
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-3">
                       <div className="w-9 h-9 rounded-full bg-brand-100 flex items-center justify-center flex-shrink-0">
@@ -556,12 +569,16 @@ export default function ClientesPage() {
                   </td>
                   <td className="px-3 py-4">
                     <div className="flex items-center gap-2">
-                      <Link
-                        href={`/clientes/${encodeURIComponent(cliente.tel)}`}
-                        className="text-xs text-brand-600 hover:text-brand-700 font-medium"
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setSelectedClienteTel(cliente.tel)
+                        }}
+                        className="text-xs text-brand-600 hover:text-brand-700 font-medium flex items-center gap-1.5 bg-brand-50 hover:bg-brand-100 px-3 py-1.5 rounded-full transition-colors"
                       >
-                        Ver →
-                      </Link>
+                        <Maximize2 className="w-3.5 h-3.5" />
+                        Ver
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -571,6 +588,12 @@ export default function ClientesPage() {
           </table>
         )}
       </div>
+      {selectedClienteTel && (
+        <ClienteDetailModal
+          telDecoded={selectedClienteTel}
+          onClose={() => setSelectedClienteTel(null)}
+        />
+      )}
     </div>
   )
 }
