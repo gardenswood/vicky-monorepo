@@ -203,10 +203,13 @@ export default function ClienteDetailModal({ telDecoded, onClose }: ClienteDetai
   async function saveChanges() {
     setSaving(true)
     try {
-      await updateDoc(doc(db, 'clientes', telDecoded), {
-        ...draft,
-        ultimaActualizacion: serverTimestamp(),
+      const payload: Record<string, any> = { ultimaActualizacion: serverTimestamp() }
+      Object.entries(draft).forEach(([k, v]) => {
+        if (v !== undefined) {
+          payload[k] = v
+        }
       })
+      await updateDoc(doc(db, 'clientes', telDecoded), payload)
       setEditing(false)
     } catch (err) {
       console.error(err)
