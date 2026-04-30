@@ -1,6 +1,7 @@
 'use strict';
 
 const kontrolproBridge = require('./kontrolpro-bridge');
+const { sanitizeCustomerFacingText } = require('./customer-facing-sanitize');
 
 /** TTS de acuse si el cliente mandó nota de voz y Gemini no envía [AUDIO_CORTO:…]. Variado; no repetir la misma que el turno anterior (sesión). */
 const FALLBACK_AUDIO_CORTO_SIN_NOMBRE = [
@@ -213,7 +214,7 @@ async function ejecutarTurnoVickyGeminiCore(deps, params) {
     }
 
     async function sendTextoSaliente(t) {
-        const s = (t || '').trim();
+        const s = sanitizeCustomerFacingText(t);
         if (!s) return;
         if (esIg) await instagramDm.enviarDmInstagram(instagramPsid, s);
         else await sendBotMessage(remoteJid, { text: s });
@@ -396,7 +397,7 @@ async function ejecutarTurnoVickyGeminiCore(deps, params) {
             const partes = [];
             partes.push({ inlineData: { data: audioClienteBase64, mimeType: audioClienteMime } });
             partes.push({
-                text: `${ctxTiempo}\n${ctxLead}\nEl cliente envió este mensaje de voz. Transcribí internamente TODO lo que dice (de principio a fin, sin cortar) y respondé como Vicky según el contenido completo del audio.`,
+                text: `${ctxTiempo}\n${ctxLead}\nEl cliente envió un mensaje de voz. Usalo solo para entender la consulta y responder como Vicky. PROHIBIDO mostrar transcripciones, resúmenes del audio, razonamiento interno, análisis interno o marcadores operativos al cliente. Respondé directo, natural y útil, sin decir "en el audio dijiste" ni copiar literalmente lo que escuchaste.`,
             });
             contenidoMensaje = partes;
         } else if (imagenBase64) {
@@ -433,27 +434,13 @@ async function ejecutarTurnoVickyGeminiCore(deps, params) {
 
         let respuesta = result.response.text();
 
-        let userParts;
+        let userHistoryParts;
         if (audioClienteBase64) {
-            userParts = [
-                { inlineData: { data: audioClienteBase64, mimeType: audioClienteMime } },
-                { text: text || '[audio]' },
-            ];
+            userHistoryParts = [{ text: text ? `${text}\n[audio de voz procesado internamente]` : '[audio de voz procesado internamente]' }];
         } else if (imagenBase64) {
-            userParts = [
-                { inlineData: { data: imagenBase64, mimeType: imagenMime } },
-                { text: text || '[imagen]' },
-            ];
+            userHistoryParts = [{ text: text ? `${text}\n[imagen procesada internamente]` : '[imagen procesada internamente]' }];
         } else {
-            userParts = [{ text }];
-        }
-        session.chatHistory.push(
-            { role: 'user', parts: userParts },
-            { role: 'model', parts: [{ text: respuesta }] }
-        );
-
-        if (session.chatHistory.length > 20) {
-            session.chatHistory = session.chatHistory.slice(-20);
+            userHistoryParts = [{ text }];
         }
 
         const cotizMatch = respuesta.match(/\[COTIZACION:(lena|cerco|pergola|fogonero|bancos|madera)\]/i);
@@ -771,12 +758,14 @@ async function ejecutarTurnoVickyGeminiCore(deps, params) {
         const fidelizarMatch = respuesta.match(/\[AUDIO_FIDELIZAR:([^\]]+)\]/i);
         let fraseFidelizarEnviada = null;
         if (fidelizarMatch && audioFidelizacionHabilitado) {
-            const fraseFidelizar = fidelizarMatch[1].trim();
+            const fraseFidelizar = sanitizeCustomerFacingText(fidelizarMatch[1]);
             fraseFidelizarEnviada = fraseFidelizar;
             respuesta = respuesta.replace(/\[AUDIO_FIDELIZAR:[^\]]+\]\s*/i, '').trim();
-            await enviarAudioElevenLabs(sendBotMessage, remoteJid, fraseFidelizar);
-            await delay(1000);
-            console.log(`🎙️ Audio fidelización enviado a ${remoteJid}`);
+            if (fraseFidelizar) {
+                await enviarAudioElevenLabs(sendBotMessage, remoteJid, fraseFidelizar);
+                await delay(1000);
+                console.log(`🎙️ Audio fidelización enviado a ${remoteJid}`);
+            }
         } else if (fidelizarMatch) {
             respuesta = respuesta.replace(/\[AUDIO_FIDELIZAR:[^\]]+\]\s*/i, '').trim();
         }
@@ -784,14 +773,14 @@ async function ejecutarTurnoVickyGeminiCore(deps, params) {
         let fraseAudioCorto = null;
         const audioCortoMatch = respuesta.match(/\[AUDIO_CORTO:([^\]]+)\]/i);
         if (audioCortoMatch) {
-            const contenido = audioCortoMatch[1].trim();
+            const contenido = sanitizeCustomerFacingText(audioCortoMatch[1]);
             const palabras = contenido.split(/\s+/).length;
-            if (palabras <= 25) {
+            if (contenido && palabras <= 25) {
                 fraseAudioCorto = contenido;
                 respuesta = respuesta.replace(/\[AUDIO_CORTO:[^\]]+\]\s*/i, '').trim();
             } else {
-                respuesta = respuesta.replace(/\[AUDIO_CORTO:([^\]]+)\]/i, '$1').trim();
-                console.log(`⚠️ AUDIO_CORTO demasiado largo (${palabras} palabras), usando como texto`);
+                respuesta = respuesta.replace(/\[AUDIO_CORTO:[^\]]+\]\s*/i, '').trim();
+                console.log(`⚠️ AUDIO_CORTO inválido o demasiado largo (${palabras} palabras), descartado`);
             }
         }
 
@@ -820,25 +809,7 @@ async function ejecutarTurnoVickyGeminiCore(deps, params) {
         }
 
         if (tieneImagen && audioTtsHabilitado && !audioEnviado) {
-            const textoParaAudio = respuesta
-                .replace(/\[COTIZACION:[^\]]+\]/gi, '')
-                .replace(/\[CONFIRMADO\]/gi, '')
-                .replace(/\[NOMBRE:[^\]]+\]/gi, '')
-                .replace(/\[DIRECCION:[^\]]+\]/gi, '')
-                .replace(/\[ZONA:[^\]]+\]/gi, '')
-                .replace(/\[BARRIO:[^\]]+\]/gi, '')
-                .replace(/\[LOCALIDAD:[^\]]+\]/gi, '')
-                .replace(/\[REFERENCIA:[^\]]+\]/gi, '')
-                .replace(/\[NOTAS_UBICACION:[^\]]+\]/gi, '')
-                .replace(/\[METODO_PAGO:[^\]]+\]/gi, '')
-                .replace(/\[PEDIDO:[^\]]+\]/gi, '')
-                .replace(/\[PEDIDO_LENA:[^\]]+\]/gi, '')
-                .replace(/\[CRM:[^\]]+\]/gi, '')
-                .replace(/\[NOTIFICAR_VENTA:[^\]]+\]/gi, '')
-                .replace(/\[NOTIFICAR_DATOS_ENTREGA\]/gi, '')
-                .replace(/\[AGENDAR:[^\]]+\]/gi, '')
-                .replace(/\[ENTREGA:[^\]]+\]/gi, '')
-                .trim();
+            const textoParaAudio = sanitizeCustomerFacingText(respuesta);
             audioEnviado = await enviarAudioElevenLabs(sendBotMessage, remoteJid, textoParaAudio);
             if (audioEnviado) await delay(800);
         }
@@ -854,12 +825,27 @@ async function ejecutarTurnoVickyGeminiCore(deps, params) {
                 .replace(/^(perfecto[,!]?\s*[^!\n]{0,40}[!.]?\s*)/i, '')
                 .trim();
         }
-        const textoFinal = textoSinSaludo;
+        const textoFinal = sanitizeCustomerFacingText(textoSinSaludo);
         const hayImagen = !!imgMatch;
         const debeEnviarTexto =
             !audioEnviado
             || (audioEnviado && hayImagen)
             || (audioEnviado && audioEnviadoEsSoloAcuseNotaCliente);
+
+        const textoModeloHistorial = sanitizeCustomerFacingText(
+            textoFinal
+            || (audioEnviado ? (fraseAudioCorto || fraseFidelizarEnviada || '[respuesta en audio]') : '')
+            || '[respuesta sin texto visible]'
+        );
+        session.chatHistory.push(
+            { role: 'user', parts: userHistoryParts },
+            { role: 'model', parts: [{ text: textoModeloHistorial }] }
+        );
+
+        if (session.chatHistory.length > 20) {
+            session.chatHistory = session.chatHistory.slice(-20);
+        }
+
         console.log(
             `📝 Texto (${textoFinal.length} chars, audio=${audioEnviado}, img=${hayImagen}, enviar=${debeEnviarTexto}): "${textoFinal.substring(0, 100)}"`
         );

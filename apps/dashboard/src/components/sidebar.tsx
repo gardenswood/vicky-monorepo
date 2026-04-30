@@ -34,6 +34,11 @@ const navItems = [
     icon: MessageSquare,
   },
   {
+    label: 'Asistente Vicky',
+    href: '/asistente',
+    icon: Bot,
+  },
+  {
     label: 'CRM Ventas',
     href: '/clientes',
     icon: Users,

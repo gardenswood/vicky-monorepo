@@ -116,6 +116,23 @@ service cloud.firestore {
       }
     }
 
+    // ── Asistente del dashboard: auditoría y cola de cambios ───────────────
+    // Las escrituras operativas se hacen vía API server-side con Admin SDK.
+    match /assistant_runs/{runId} {
+      allow read: if isViewer();
+      allow write: if false;
+    }
+
+    match /assistant_changes/{changeId} {
+      allow read: if isViewer();
+      allow write: if false;
+    }
+
+    match /change_requests/{requestId} {
+      allow read: if isViewer();
+      allow write: if false;
+    }
+
     // ── Log de mensajes (analytics) ───────────────────────────────────────
     // Solo lectura para el dashboard; el bot escribe vía service account (admin SDK)
     match /mensajes_log/{logId} {

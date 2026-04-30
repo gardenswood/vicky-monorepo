@@ -43,6 +43,7 @@ Checklist rápida para desplegar cambios sin romper:
 | `config/prompts` → `instruccionCierreEntregaHumanoGemini` | Instrucciones AI → **Cierre entrega** | Bloque extra a Gemini mientras `chats/{jid}.cierreEntregaAsistido` | Igual; lectura por turno |
 | `config/general` | General | Delays, modelo Gemini, audio fidelización, `botActivo`, **`instagramDmActivo`**, `whatsappLabelIdContactarAsesor`, campañas `#RUTA`, **cron geocode** (`geocodeCronActivo`, `geocodeCronMaxPorEjecucion`), **`whatsappGrupoJidAgendaEntregas`** + **`notificarAgendaEntregasGrupoActivo`** (aviso grupo WA por cada alta en `entregas_agenda`; caché ~5 min) | Sí: redeploy bot si cambia código; JID grupo / flags agenda suelen aplicar sin redeploy |
 | `config/prompts/borradores/*` | Borradores prompt (legado) | WhatsApp `#g` + *OK* aplica **directo** a `sistemaPrompt` (bot + recarga Gemini en esa instancia). La subcolección puede quedar para borradores viejos o flujo panel | No |
+| `assistant_runs`, `assistant_changes`, `change_requests` | **Asistente Vicky** (`/asistente` + chat flotante) | Propuestas, confirmaciones, auditoría `before/after`, rollback y sync. Al aplicar cambios sensibles escribe `config/general.recargarBotAt` para recarga runtime | No para Firestore; sí deploy durable si cambia prompt, servicios o código |
 | `mensajes_programados/*` | **Agenda de entregas** (`/agenda-entregas`) junto con `entregas_agenda` | Mensajes diferidos (`[AGENDAR:…]`); envío vía cron HTTP | No (bot + Scheduler) |
 | `entregas_agenda/*` | **Agenda de entregas** (`/agenda-entregas`) | Vicky: `[ENTREGA:…]` → fila; panel: alta/edición; bot puede enviar resumen al grupo configurado en `config/general` | Sí: redeploy `vicky-bot` si cambia lógica de avisos/parser |
 | `clientes/{tel}` campos CRM | Ficha cliente | CRM comercial general para todos los servicios: identidad (`nombre`, `pushName`, `telefono`, `remoteJid`, `whatsappLid`), `potencial`, `statusCrm`, `urgencia`, `interes[]`, `servicioPendiente`, `proximoContactoAt`, `zona`, **`direccion`**, **`barrio`**, **`localidad`**, **`referencia`**, **`notasUbicacion`** (mapa + geocode Nominatim), **`lat`/`lng`**, **`tipoLenaPreferido`** (solo filtros/rutas de leña); el bot rellena identidad desde WhatsApp/contactos y ubicación con marcadores `[DIRECCION:…]`, `[ZONA:…]`, `[BARRIO:…]`, etc. La operación de reparto de leña queda aparte en `consultasLena` / `/logistica-zonas` y `colaLena` / `/cola-lena` | No |
@@ -111,10 +112,22 @@ Opciones: `--max=50` (tope por corrida), `--dry-run` (no escribe Firestore), `--
 
 **Flujo**: primero termina el delay de escritura, **después** se llama a Gemini (la respuesta tarda más en llegar, se siente más humano).
 
+### Asistente Vicky (dashboard)
+
+- Chat flotante global en el dashboard: propone cambios de promociones, servicios, prompts, config, clientes, agenda y logística.
+- Siempre requiere confirmación antes de escribir.
+- Auditoría: `/asistente` muestra runs, operaciones, sync y rollback.
+- Recarga runtime del bot:
+  - Poll automático del bot cada `VICKY_RUNTIME_RELOAD_POLL_MS` (default 60 s) mirando `config/general.recargarBotAt`.
+  - Endpoint inmediato: `POST /internal/reload/runtime` con `Authorization: Bearer <VICKY_CRON_SECRET>`.
+- Variables opcionales del dashboard para sync:
+  - `VICKY_BOT_INTERNAL_RELOAD_URL` + `VICKY_CRON_SECRET` o `VICKY_BOT_INTERNAL_RELOAD_SECRET`: recarga inmediata del bot.
+  - `GITHUB_ACTIONS_DISPATCH_TOKEN` + `GITHUB_REPOSITORY`: dispatch del workflow `.github/workflows/assistant-sync.yml`.
+
 ### Precios y servicios (sin tocar código)
 - Panel → **Precios y servicios** (`/config/precios`): editá montos, unidades, texto de envío, servicio activo/inactivo.
 - Guardá con **Guardar todos**.
-- **Redeploy** de `vicky-bot` en Cloud Run para que cargue los precios nuevos (se leen al arranque).
+- El bot puede recargar en caliente si se actualiza `config/general.recargarBotAt`; de todos modos hacé **redeploy durable** de `vicky-bot` para que la revisión nueva arranque alineada.
 
 ## 1b) Firestore: reglas e índices (Git → nube)
 
@@ -132,7 +145,13 @@ cd "Bot_WhatsApp_Lena"
 firebase deploy --only firestore --project webgardens-8655d
 ```
 
-**GitHub Actions:** workflow `Deploy Firestore (reglas e índices)` al pushear cambios bajo `firebase/`. Requiere el secret **`FIREBASE_TOKEN`**.
+**GitHub Actions:** en monorepo, los workflows raíz están en `.github/workflows/`:
+- `deploy-bot.yml`
+- `deploy-dashboard.yml`
+- `deploy-firestore.yml`
+- `assistant-sync.yml`
+
+Usan Workload Identity Federation (`GCP_WIF_PROVIDER`, `GCP_WIF_SERVICE_ACCOUNT`). Si seguís usando workflows viejos dentro de `apps/*/.github`, verificá en GitHub Actions que realmente se ejecuten desde la raíz del repo.
 
 - **Generar el token (solo en tu PC, con consola interactiva):** desde la raíz del repo del bot:
   ```powershell

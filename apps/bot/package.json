@@ -11,6 +11,7 @@
     "docs:pdf": "node scripts/generate-knowledge-pdfs.js",
     "verify": "node scripts/verify-flow.js",
     "smoke:gemini": "node scripts/smoke-gemini-model.js",
+    "test:sanitize": "node scripts/test-customer-facing-sanitize.js",
     "config:export": "node scripts/sync-vicky-config.js export",
     "config:import": "node scripts/sync-vicky-config.js import",
     "config:clean-gardens": "node scripts/clean-gardens-config.js",

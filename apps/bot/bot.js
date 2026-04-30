@@ -57,6 +57,7 @@ const VICKY_GEMINI_MODEL_DEFAULT = 'gemini-3.1-flash-lite-preview';
 const firestoreModule = require('./firestore-module');
 const { ejecutarCronGeocodificacionClientes } = require('./cron-geocode-clientes');
 const { ejecutarTurnoVickyGeminiCore } = require('./vicky-gemini-turn');
+const { sanitizeCustomerFacingText } = require('./customer-facing-sanitize');
 const instagramDmMod = require('./instagram-dm');
 const kontrolproAdmin = require('./kontrolpro-admin');
 
@@ -349,11 +350,33 @@ const server = http.createServer((req, res) => {
         });
     }
 
+    if (req.method === 'POST' && urlPathOnly === '/internal/reload/runtime') {
+        let raw = '';
+        req.on('data', (c) => { raw += c; });
+        return req.on('end', async () => {
+            const secretConfigured = vickyCronSecretTrimmed();
+            const authed = isCronRequestAuthorized(req) || cronJsonBodyMatchesSecret(raw);
+            if (!secretConfigured || !authed) {
+                logCronAuth401(req, urlPathOnly, {
+                    bodySecretTried: process.env.VICKY_CRON_ALLOW_BODY_SECRET === '1',
+                });
+                return send(401, 'unauthorized');
+            }
+            try {
+                const changed = await recargarRuntimeVickyDesdeFirestore({ force: true, motivo: 'http' });
+                send(200, JSON.stringify({ ok: true, reloaded: changed }), 'application/json; charset=utf-8');
+            } catch (e) {
+                send(500, JSON.stringify({ ok: false, error: e.message }), 'application/json; charset=utf-8');
+            }
+        });
+    }
+
     if (
         req.method === 'GET' &&
         (urlPathOnly === '/internal/cron/programados' ||
             urlPathOnly === '/internal/cron/weather' ||
-            urlPathOnly === '/internal/cron/geocode-clientes')
+            urlPathOnly === '/internal/cron/geocode-clientes' ||
+            urlPathOnly === '/internal/reload/runtime')
     ) {
         return send(
             405,
@@ -419,7 +442,7 @@ server.listen(PORT, () => {
     );
     console.log(`${bar}\n`);
     console.log(
-        `📡 HTTP puerto ${PORT} (GET /health, GET /health/whatsapp JSON, GET /legal/politica-privacidad, POST /internal/cron/* Bearer, GET|POST /webhooks/instagram)`
+        `📡 HTTP puerto ${PORT} (GET /health, GET /health/whatsapp JSON, GET /legal/politica-privacidad, POST /internal/cron/* Bearer, POST /internal/reload/runtime Bearer, GET|POST /webhooks/instagram)`
     );
     const cs = vickyCronSecretTrimmed();
     if (cs.length) {
@@ -963,6 +986,8 @@ let lastAgendaGrupoSkipLogMs = 0;
 /** Firestore + Gemini + delays: solo la primera vez; reconexiones solo recrean el socket. */
 let vickyBootstrapHecho = false;
 let vickyGeminiModel = null;
+let vickyRuntimeReloadPollStarted = false;
+let vickyRuntimeReloadKey = '';
 /** Cliente Gemini reutilizado para recargar `systemInstruction` tras #g + OK sin reiniciar el proceso. */
 let vickyGoogleGenAI = null;
 const vickyRuntimeCfg = {
@@ -3895,23 +3920,8 @@ function normalizarTextoParaAudio(texto) {
 async function generarAudioElevenLabs(texto) {
     if (!ELEVENLABS_API_KEY || !ELEVENLABS_VOICE_ID) return null;
     try {
-        // Limpiar marcadores del texto antes de convertir a audio
-        const textoLimpio = normalizarTextoParaAudio(
-            texto
-                .replace(/\[IMG:[^\]]+\]/gi, '')
-                .replace(/\[COTIZACION:[^\]]+\]/gi, '')
-                .replace(/\[CONFIRMADO\]/gi, '')
-                .replace(/\[NOMBRE:[^\]]+\]/gi, '')
-                .replace(/\[DIRECCION:[^\]]+\]/gi, '')
-                .replace(/\[ZONA:[^\]]+\]/gi, '')
-        .replace(/\[BARRIO:[^\]]+\]/gi, '')
-        .replace(/\[LOCALIDAD:[^\]]+\]/gi, '')
-        .replace(/\[REFERENCIA:[^\]]+\]/gi, '')
-        .replace(/\[NOTAS_UBICACION:[^\]]+\]/gi, '')
-                .replace(/\[METODO_PAGO:[^\]]+\]/gi, '')
-                .replace(/\[PEDIDO:[^\]]+\]/gi, '')
-                .replace(/\[PEDIDO_LENA:[^\]]+\]/gi, '')
-        ).trim();
+        // Ultima barrera: ElevenLabs nunca debe leer marcadores ni texto interno.
+        const textoLimpio = normalizarTextoParaAudio(sanitizeCustomerFacingText(texto)).trim();
 
         if (!textoLimpio) return null;
 
@@ -5711,6 +5721,93 @@ async function recargarVickyGeminiSystemPrompt() {
     }
 }
 
+function timestampRuntimeKey(value) {
+    if (!value) return '';
+    if (typeof value.toMillis === 'function') return String(value.toMillis());
+    if (typeof value.toDate === 'function') return String(value.toDate().getTime());
+    if (value instanceof Date) return String(value.getTime());
+    if (typeof value === 'number' || typeof value === 'string') return String(value);
+    return '';
+}
+
+function aplicarConfigGeneralRuntime(configGeneral) {
+    const delayMinS = Number(configGeneral.delayMinSeg);
+    const delayMaxS = Number(configGeneral.delayMaxSeg);
+    const minEscS = Math.max(26, Number.isFinite(delayMinS) ? delayMinS : 26);
+    let maxEscS = Number.isFinite(delayMaxS) ? delayMaxS : 34;
+    if (maxEscS < minEscS + 2) maxEscS = minEscS + 8;
+    vickyRuntimeCfg.DELAY_MIN = minEscS * 1000;
+    vickyRuntimeCfg.DELAY_MAX = maxEscS * 1000;
+
+    if (!String(process.env.GEMINI_MODEL || '').trim()) {
+        vickyRuntimeCfg.MODEL_GEMINI = String(configGeneral.modeloGemini || '').trim() || VICKY_GEMINI_MODEL_DEFAULT;
+    }
+    const freqFidelRaw = parseInt(configGeneral.frecuenciaAudioFidelizacion, 10);
+    vickyRuntimeCfg.FIDELIZAR_CADA = (Number.isFinite(freqFidelRaw) && freqFidelRaw >= 18)
+        ? Math.min(99, freqFidelRaw)
+        : 0;
+    vickyRuntimeCfg.BOT_ACTIVO = configGeneral.botActivo !== false;
+
+    const labelHandoff = String(
+        configGeneral.whatsappLabelIdContactarAsesor
+        || process.env.WHATSAPP_LABEL_ID_CONTACTAR_ASESOR
+        || ''
+    ).trim();
+    vickyRuntimeCfg.WHATSAPP_LABEL_ID_CONTACTAR_ASESOR = labelHandoff;
+    vickyRuntimeCfg.ADMIN_PHONE_DIGITS = String(configGeneral.adminPhone || process.env.ADMIN_PHONE || '').replace(/\D/g, '');
+
+    const panelDe = configGeneral.datosEntregaNotifyPhone;
+    const tienePanelDe = panelDe != null && String(panelDe).replace(/\D/g, '').length > 0;
+    const rawDatosEntrega = tienePanelDe
+        ? panelDe
+        : (process.env.VICKY_DATOS_ENTREGA_NOTIFY_PHONE || '5493512956376');
+    vickyRuntimeCfg.DATOS_ENTREGA_NOTIFY_DIGITS = normalizarDigitosNotifOperacion(rawDatosEntrega);
+
+    vickyRuntimeCfg.GRUPO_JID_AGENDA_ENTREGAS = normalizarJidGrupoAgendaEntregas(
+        configGeneral.whatsappGrupoJidAgendaEntregas || process.env.WHATSAPP_GRUPO_JID_AGENDA_ENTREGAS
+    );
+    vickyRuntimeCfg.NOTIFICAR_AGENDA_GRUPO_ACTIVO = configGeneral.notificarAgendaEntregasGrupoActivo !== false;
+
+    const cMin = Number(configGeneral.campanaDelayMinSeg);
+    const cMax = Number(configGeneral.campanaDelayMaxSeg);
+    vickyRuntimeCfg.CAMPANA_DELAY_MIN_MS = Math.max(5000, (Number.isFinite(cMin) ? cMin : 15) * 1000);
+    vickyRuntimeCfg.CAMPANA_DELAY_MAX_MS = Math.max(
+        vickyRuntimeCfg.CAMPANA_DELAY_MIN_MS,
+        (Number.isFinite(cMax) ? cMax : 20) * 1000
+    );
+    vickyRuntimeCfg.CAMPANA_MAX = Math.min(200, Math.max(5, parseInt(configGeneral.campanaMaxDestinatarios, 10) || 40));
+    vickyRuntimeCfg.CAMPANA_DESC_PCT = Number.isFinite(Number(configGeneral.campanaDescuentoPct))
+        ? Number(configGeneral.campanaDescuentoPct)
+        : 10;
+}
+
+async function recargarRuntimeVickyDesdeFirestore({ force = false, motivo = 'poll' } = {}) {
+    if (!firestoreModule.isAvailable()) return false;
+    const configGeneral = await firestoreModule.getConfigGeneral({ bypassCache: true });
+    const key = timestampRuntimeKey(configGeneral.recargarBotAt)
+        || timestampRuntimeKey(configGeneral.ultimaActualizacion)
+        || timestampRuntimeKey(configGeneral.actualizadoEn);
+    if (!force && key && key === vickyRuntimeReloadKey) return false;
+    aplicarConfigGeneralRuntime(configGeneral);
+    const okPrompt = await recargarVickyGeminiSystemPrompt();
+    if (key) vickyRuntimeReloadKey = key;
+    console.log(`🔄 Runtime Vicky recargado desde Firestore (${motivo}, prompt=${okPrompt ? 'ok' : 'sin-cambio'}).`);
+    return true;
+}
+
+function iniciarRuntimeReloadPoller() {
+    if (vickyRuntimeReloadPollStarted) return;
+    vickyRuntimeReloadPollStarted = true;
+    const rawMs = parseInt(String(process.env.VICKY_RUNTIME_RELOAD_POLL_MS || '').trim(), 10);
+    const pollMs = Number.isFinite(rawMs) ? Math.max(15000, rawMs) : 60000;
+    setInterval(() => {
+        recargarRuntimeVickyDesdeFirestore({ motivo: 'poll' }).catch((e) => {
+            console.warn('⚠️ Runtime reload poll:', e.message);
+        });
+    }, pollMs);
+    console.log(`🔁 Runtime reload poll activo cada ${Math.round(pollMs / 1000)}s.`);
+}
+
 async function connectToWhatsApp(isReconnect = false) {
     if (!isReconnect) {
     console.log('🔌 Iniciando conexión con WhatsApp...');
@@ -5870,6 +5967,11 @@ async function connectToWhatsApp(isReconnect = false) {
         }
 
         vickyBootstrapHecho = true;
+        vickyRuntimeReloadKey = timestampRuntimeKey(configGeneral.recargarBotAt)
+            || timestampRuntimeKey(configGeneral.ultimaActualizacion)
+            || timestampRuntimeKey(configGeneral.actualizadoEn)
+            || '';
+        iniciarRuntimeReloadPoller();
     }
 
     if (firestoreModule.isAvailable() && colaLena.length > 0) {

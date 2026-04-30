@@ -10,7 +10,7 @@ Operación del panel, redeploy y recuperación de prompts: [`CONFIGURACION_PANEL
 
 | Documento | Campos principales | Escritura | Lectura bot |
 |-----------|-------------------|-----------|-------------|
-| `general` | `delayMinSeg`, `delayMaxSeg`, `modeloGemini`, `frecuenciaAudioFidelizacion`, `tiempoSilencioHumanoHoras`, `botActivo`, **`instagramDmActivo`**, `adminPhone`, **`datosEntregaNotifyPhone`**, horarios atención, `whatsappLabelIdContactarAsesor`, campañas (`campanaDelayMinSeg`, `campanaDelayMaxSeg`, `campanaMaxDestinatarios`, `campanaDescuentoPct`, `campanaRutaFechaTexto`, `campanaRutaPlantilla`), **`geocodeCronActivo`**, **`geocodeCronMaxPorEjecucion`**, **`whatsappGrupoJidAgendaEntregas`**, **`notificarAgendaEntregasGrupoActivo`**, **`colaLenaCapacidadCamionKg`** (default 1000 — barra del panel cola leña), **`colaLenaUmbralDisparoRutaKg`** (default igual a capacidad: al alcanzar esa suma de kg `en_cola`, el bot arma ruta con **Google Directions `optimize:true`** o vecino más cercano y avisa al admin) | Panel → General | Cache ~5 min en la mayoría de campos; **`whatsappGrupoJidAgendaEntregas`** / toggle agenda se leen **sin caché** en cada aviso al grupo (evita JID vacío tras guardar en panel). Hook + sondeo ~50 s |
+| `general` | `delayMinSeg`, `delayMaxSeg`, `modeloGemini`, `frecuenciaAudioFidelizacion`, `tiempoSilencioHumanoHoras`, `botActivo`, **`instagramDmActivo`**, `adminPhone`, **`datosEntregaNotifyPhone`**, horarios atención, `whatsappLabelIdContactarAsesor`, campañas (`campanaDelayMinSeg`, `campanaDelayMaxSeg`, `campanaMaxDestinatarios`, `campanaDescuentoPct`, `campanaRutaFechaTexto`, `campanaRutaPlantilla`), **`geocodeCronActivo`**, **`geocodeCronMaxPorEjecucion`**, **`whatsappGrupoJidAgendaEntregas`**, **`notificarAgendaEntregasGrupoActivo`**, **`colaLenaCapacidadCamionKg`** (default 1000 — barra del panel cola leña), **`colaLenaUmbralDisparoRutaKg`** (default igual a capacidad: al alcanzar esa suma de kg `en_cola`, el bot arma ruta con **Google Directions `optimize:true`** o vecino más cercano y avisa al admin), **`recargarBotAt`**, **`recargarBotMotivo`** | Panel → General / Asistente Vicky | Cache ~5 min en la mayoría de campos; **`botActivo`** y algunos toggles críticos se leen sin caché. Si cambia `recargarBotAt`, el bot recarga runtime (prompts, servicios, promos, skills y config general) por poll o endpoint interno. |
 | `prompts` | `sistemaPrompt`, `sistemaPromptAdmin`, `mensajeBienvenidaTexto`, **`mensajeClienteCierreEntregaHumano`** (WhatsApp al cliente al disparar admin `#final_entrega`), **`instruccionCierreEntregaHumanoGemini`** (bloque extra al modelo mientras `chats/{jid}.cierreEntregaAsistido`) | Panel → Instrucciones AI | Al armar Gemini, el bot **anteponde** (código) el bloque fijo *IDENTIDAD GARDENS WOOD* y luego `sistemaPrompt` (o fallback `SYSTEM_PROMPT` en `bot.js`). Después: bloque servicios + `SYSTEM_PROMPT_SUFIJO_*` (ubicación, nombre, cola leña). Mantener `sistemaPrompt` alineado solo a Gardens Wood (no mezclar otro negocio). |
 
 **Subcolección** `config/prompts/versiones/{id}` — historial de versiones del prompt (panel).
@@ -33,7 +33,7 @@ IDs alineados con el bot y el panel: `lena`, `cerco`, `pergola`, `fogonero`, `ba
 | `marcador` | string | ej. `[IMG:lena]` |
 | `ultimaActualizacion` | timestamp | Panel al guardar |
 
-**Escritura:** panel Precios y servicios. **Lectura bot:** al arranque; se anexa al system prompt como `[DATOS_SERVICIOS_FIRESTORE]`. Tras cambiar precios, **redeploy o restart** de `vicky-bot` en Cloud Run.
+**Escritura:** panel Precios y servicios o Asistente Vicky. **Lectura bot:** al arranque y por recarga runtime cuando `config/general.recargarBotAt` cambia; se anexa al system prompt como `[DATOS_SERVICIOS_FIRESTORE]`. Tras cambiar precios, conviene mantener **redeploy durable** de `vicky-bot` aunque la revisión en marcha ya pueda recargar.
 
 ### `chats/{jid}`
 
@@ -215,6 +215,42 @@ Skills internas de Vicky versionadas en Git (`apps/bot/vicky-skills`) y editable
 Subcolección `vicky_skills/{skillId}/versiones/{versionId}`: snapshots guardados por el dashboard antes de actualizar una skill.
 
 El bot lee `vicky_skills/*` al armar Gemini. Si Firestore no tiene skills, usa fallback local desde `apps/bot/vicky-skills/*.md`.
+
+### Asistente Vicky: `assistant_runs`, `assistant_changes`, `change_requests`
+
+El dashboard monta un chat flotante global y escribe cambios operativos mediante APIs server-side (`apps/dashboard/src/app/api/assistant/*`) con Firebase Admin SDK. El usuario siempre confirma antes de aplicar.
+
+`assistant_runs/{runId}`:
+
+| Campo | Tipo | Notas |
+|-------|------|-------|
+| `message` | string | Pedido original del usuario. |
+| `origin` | string | `dashboard`, `whatsapp_admin`, `cursor_chat` o `code`. |
+| `user` | map | `uid`, `email`, `role`, `nombre`. |
+| `status` | string | `planned`, `needs_more_detail`, `applying`, `applied`, `failed`, `rolled_back`. |
+| `operations` | array | Cambios validados: destino Firestore, descripción, `before`/`after`, flags `requiresBotReload` / `requiresDeploy`. |
+| `sync` | map | Estado de Firestore, recarga bot, GitHub Actions/Cloud Build y Cloud Run. |
+| `createdAt`, `updatedAt`, `appliedAt`, `rolledBackAt` | Timestamp | Auditoría. |
+
+`assistant_changes/{changeId}`:
+
+| Campo | Tipo | Notas |
+|-------|------|-------|
+| `runId` | string | Relación con `assistant_runs`. |
+| `operation` | map | Operación aplicada. |
+| `before`, `after` | map/null | Snapshot para auditoría y rollback. |
+| `rollbackStatus` | string | `available` o `rolled_back`. |
+| `appliedBy`, `rolledBackBy` | map | Usuario del panel. |
+
+`change_requests/{runId}`:
+
+| Campo | Tipo | Notas |
+|-------|------|-------|
+| `message`, `origin`, `status`, `operationCount` | varios | Cola unificada de cambios para dashboard, WhatsApp admin, Cursor/chat o código. |
+| `createdBy` | map | Usuario u origen. |
+| `createdAt`, `updatedAt` | Timestamp | Auditoría. |
+
+**Reglas:** lectura para usuarios autenticados del panel; escritura directa desde cliente denegada. Las APIs del dashboard aplican cambios con Admin SDK y registran auditoría.
 
 ### `adminWaSesion/{docId}`
 

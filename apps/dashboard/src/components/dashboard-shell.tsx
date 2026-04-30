@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Menu } from 'lucide-react'
 import Sidebar from '@/components/sidebar'
+import { AssistantFloatingChat } from '@/components/assistant-floating-chat'
 import { cn } from '@/lib/utils'
 
 /**
@@ -45,6 +46,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         </header>
         {children}
       </main>
+      <AssistantFloatingChat />
     </div>
   )
 }
