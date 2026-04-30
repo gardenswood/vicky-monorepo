@@ -108,12 +108,12 @@ export const SERVICIO_COLORS: Record<string, string> = {
 }
 
 export const ESTADO_LABELS: Record<string, string> = {
-  nuevo: 'Nuevo',
-  cotizacion: 'Cotización enviada',
-  cotizacion_enviada: 'Cotización enviada',
-  confirmado: 'Confirmado',
-  cliente: 'Cliente',
-  silenciado: 'Humano atendiendo',
+  nuevo: '🆕 Nuevo',
+  cotizacion: '📄 Cotización enviada',
+  cotizacion_enviada: '📄 Cotización enviada',
+  confirmado: '✅ Confirmado',
+  cliente: '🌟 Cliente',
+  silenciado: '👤 Humano atendiendo',
 }
 
 export const ESTADO_COLORS: Record<string, string> = {

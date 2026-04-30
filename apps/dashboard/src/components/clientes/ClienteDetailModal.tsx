@@ -41,6 +41,7 @@ import {
   getIdentitySecondary,
 } from '@/lib/utils'
 import Link from 'next/link'
+import ChatModal from '@/components/chats/ChatModal'
 
 interface Cliente {
   tel: string
@@ -107,12 +108,12 @@ const STATUS_CRM_COLORS: Record<string, string> = {
 }
 
 const STATUS_CRM_LABELS: Record<string, string> = {
-  pendiente_cotizacion: 'Pendiente cotización',
-  seguimiento: 'Seguimiento',
-  concreto: 'Concreto',
-  en_obra: 'En obra',
-  perdido: 'Perdido',
-  desestimado: 'Desestimado',
+  pendiente_cotizacion: '⏱️ Pendiente cotización',
+  seguimiento: '👀 Seguimiento',
+  concreto: '🎯 Concreto',
+  en_obra: '🚧 En obra',
+  perdido: '❌ Perdido',
+  desestimado: '👎 Desestimado',
 }
 
 export default function ClienteDetailModal({ telDecoded, onClose }: ClienteDetailModalProps) {
@@ -123,6 +124,7 @@ export default function ClienteDetailModal({ telDecoded, onClose }: ClienteDetai
   const [saving, setSaving] = useState(false)
   const [consultasLena, setConsultasLena] = useState<ConsultaLenaActiva[]>([])
   const [consultaModal, setConsultaModal] = useState(false)
+  const [showChatModal, setShowChatModal] = useState(false)
   const [consultaForm, setConsultaForm] = useState({ cantidadKg: '', zona: '', notas: '' })
   const [savingConsulta, setSavingConsulta] = useState(false)
 
@@ -347,12 +349,12 @@ export default function ClienteDetailModal({ telDecoded, onClose }: ClienteDetai
               </>
             )}
 
-            <Link
-              href={`/chats/${encodeURIComponent(cliente.remoteJid)}`}
+            <button
+              onClick={() => setShowChatModal(true)}
               className="btn-secondary flex items-center gap-1.5 rounded-full"
             >
               <MessageSquare className="w-4 h-4" /> <span className="hidden sm:inline">Ver chat</span>
-            </Link>
+            </button>
             {whatsappHref && (
               <a
                 href={whatsappHref}
@@ -437,10 +439,10 @@ export default function ClienteDetailModal({ telDecoded, onClose }: ClienteDetai
                         value={draft.estado ?? ''}
                         onChange={(e) => setDraft((d) => ({ ...d, estado: e.target.value }))}
                       >
-                        <option value="nuevo">Nuevo</option>
-                        <option value="cotizacion_enviada">Cotización enviada</option>
-                        <option value="confirmado">Confirmado</option>
-                        <option value="cliente">Cliente</option>
+                        <option value="nuevo">🆕 Nuevo</option>
+                        <option value="cotizacion_enviada">📄 Cotización enviada</option>
+                        <option value="confirmado">✅ Confirmado</option>
+                        <option value="cliente">🌟 Cliente</option>
                       </select>
                     ) : (
                       <span className={cn('badge text-xs px-2.5 py-1 rounded-full', ESTADO_COLORS[cliente.estado ?? ''] ?? 'bg-slate-100 text-slate-600')}>
@@ -509,12 +511,12 @@ export default function ClienteDetailModal({ telDecoded, onClose }: ClienteDetai
                         onChange={(e) => setDraft((d) => ({ ...d, statusCrm: e.target.value }))}
                       >
                         <option value="">Sin definir</option>
-                        <option value="pendiente_cotizacion">Pendiente cotización</option>
-                        <option value="seguimiento">Seguimiento</option>
-                        <option value="concreto">Concreto</option>
-                        <option value="en_obra">En obra</option>
-                        <option value="perdido">Perdido</option>
-                        <option value="desestimado">Desestimado</option>
+                        <option value="pendiente_cotizacion">⏱️ Pendiente cotización</option>
+                        <option value="seguimiento">👀 Seguimiento</option>
+                        <option value="concreto">🎯 Concreto</option>
+                        <option value="en_obra">🚧 En obra</option>
+                        <option value="perdido">❌ Perdido</option>
+                        <option value="desestimado">👎 Desestimado</option>
                       </select>
                     ) : (
                       <span className={cn('badge text-xs px-2.5 py-1 rounded-full border', STATUS_CRM_COLORS[cliente.statusCrm ?? ''] ?? 'bg-slate-100 text-slate-600')}>
@@ -806,6 +808,11 @@ export default function ClienteDetailModal({ telDecoded, onClose }: ClienteDetai
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal secundario de Chat */}
+      {showChatModal && (
+        <ChatModal jidDecoded={cliente.remoteJid} onClose={() => setShowChatModal(false)} />
       )}
     </div>
   )

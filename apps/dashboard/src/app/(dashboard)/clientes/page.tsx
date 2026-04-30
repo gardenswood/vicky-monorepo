@@ -68,12 +68,12 @@ const STATUS_CRM = ['todos', 'pendiente_cotizacion', 'seguimiento', 'concreto', 
 const ORDENES = ['recientes', 'estado_lead'] as const
 
 const STATUS_CRM_LABELS: Record<string, string> = {
-  pendiente_cotizacion: 'Pendiente cotización',
-  seguimiento: 'Seguimiento',
-  concreto: 'Concreto',
-  en_obra: 'En obra',
-  perdido: 'Perdido',
-  desestimado: 'Desestimado',
+  pendiente_cotizacion: '⏱️ Pendiente cotización',
+  seguimiento: '👀 Seguimiento',
+  concreto: '🎯 Concreto',
+  en_obra: '🚧 En obra',
+  perdido: '❌ Perdido',
+  desestimado: '👎 Desestimado',
 }
 
 const STATUS_CRM_COLORS: Record<string, string> = {
