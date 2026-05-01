@@ -12,6 +12,7 @@ alwaysApply: true
 - **El audio y el texto se envían UNA SOLA VEZ por cliente, para siempre.**
 - El flag `audioIntroEnviado: true` se guarda en `clientesHistorial` (GCS) para no repetirlo.
 - **TTS ElevenLabs (notas de voz):** en `bot.js` → `normalizarTextoParaAudio`, la letra **x** solo se sustituye por la palabra «por» cuando hay **número × número** (multiplicación). No se toca la **x** dentro de palabras (`excelente`, `exterior`, `próximo`, etc.). Si el cliente manda **audio** y Vicky responde con un TTS corto de acuse (`vicky-gemini-turn.js`), **sigue enviándose el texto largo** de Gemini (no solo el acuse). Prioridad del acuse: marcador `[AUDIO_CORTO:…]` del modelo (≤25 palabras); si falta, **frase corta aleatoria** de un conjunto variado y **sin repetir** la misma que el turno anterior en esa sesión (`ultimoFallbackAudioCortoAcuse`).
+- **Privacidad audio cliente:** el audio del cliente se usa solo para comprender la consulta. Nunca se muestra al cliente la transcripción, resumen del audio, razonamiento interno ni marcadores. La barrera compartida `customer-facing-sanitize.js` limpia texto visible, TTS e historial de modelo; si `[AUDIO_CORTO:…]` es inválido o largo, se descarta en vez de convertirlo en texto.
 
 ## Ubicación CRM (mapa / geocode)
 - Marcadores internos (Gemini): `[DIRECCION:…]`, `[ZONA:…]`, `[BARRIO:…]`, `[LOCALIDAD:…]`, `[REFERENCIA:…]`, `[NOTAS_UBICACION:…]` → Firestore `clientes/*` + sync; el cron `/internal/cron/geocode-clientes` y `npm run geocode:clientes` arman Nominatim con esos campos. Panel **Cliente** los edita.
@@ -63,7 +64,9 @@ alwaysApply: true
 - Firebase Auth + Firestore como capa de datos compartida
 - Firestore loguea cada mensaje en `chats/{jid}/mensajes/` vía `firestore-module.js`
 - Clientes se sincronizan a `clientes/{tel}` en Firestore
-- Config dinámica: el bot lee `config/general`, `config/prompts` y `servicios/*` de Firestore al arrancar (precios inyectados al prompt). Ficha **Cliente**: CRM (`potencial`, `statusCrm`, `urgencia`, `interes`, `zona`) editable; alineado con `docs/FIRESTORE_SCHEMA.md`.
+- Config dinámica: el bot lee `config/general`, `config/prompts`, `config/promociones`, `servicios/*` y `vicky_skills/*` de Firestore al arrancar; además recarga runtime si cambia `config/general.recargarBotAt` (poll default 60 s o `POST /internal/reload/runtime` con Bearer `VICKY_CRON_SECRET`). Precios y promos se reinyectan al prompt, pero sigue recomendado deploy durable de `vicky-bot`.
+- Asistente Vicky: chat flotante global del dashboard (`/asistente` para auditoría) crea `assistant_runs`, `assistant_changes` y `change_requests`; propone cambios, exige confirmación, aplica con Admin SDK, marca recarga/deploy y permite rollback.
+- Ficha **Cliente**: CRM (`potencial`, `statusCrm`, `urgencia`, `interes`, `zona`) editable; alineado con `docs/FIRESTORE_SCHEMA.md`.
 - Deploy dashboard: Cloud Run servicio `vicky-dashboard`
 - Dev local: `npm run dev` en `dashboard/` → `http://localhost:3000`
 - Crear primer admin: `npm run crear-admin` en `dashboard/`

@@ -1,6 +1,7 @@
 'use strict';
 
 const kontrolproBridge = require('./kontrolpro-bridge');
+const { sanitizeCustomerFacingText } = require('./customer-facing-sanitize');
 
 /** TTS de acuse si el cliente mandó nota de voz y Gemini no envía [AUDIO_CORTO:…]. Variado; no repetir la misma que el turno anterior (sesión). */
 const FALLBACK_AUDIO_CORTO_SIN_NOMBRE = [
@@ -44,6 +45,97 @@ function elegirFraseFallbackAudioCortoAcuse(session, primerNombre) {
     const distintos = ultima ? pool.filter((f) => f !== ultima) : pool;
     const usar = distintos.length ? distintos : pool;
     return usar[Math.floor(Math.random() * usar.length)];
+}
+
+function fechaSeguimientoDesdeAhora(horas) {
+    const d = new Date();
+    d.setHours(d.getHours() + horas);
+    return d;
+}
+
+function fechaFirestoreCrm(value) {
+    if (!value) return null;
+    if (value instanceof Date) return Number.isFinite(value.getTime()) ? value : null;
+    const ms = Date.parse(String(value));
+    return Number.isFinite(ms) ? new Date(ms) : null;
+}
+
+function normalizarPotencialCrm(value) {
+    const v = String(value || '')
+        .trim()
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/\p{M}/gu, '');
+    return v === 'frio' || v === 'tibio' || v === 'caliente' ? v : '';
+}
+
+function normalizarInteresesCrm(value) {
+    const items = Array.isArray(value) ? value : String(value || '').split(',');
+    return [...new Set(items
+        .map((x) => String(x || '').trim().toLowerCase().normalize('NFD').replace(/\p{M}/gu, ''))
+        .filter(Boolean))];
+}
+
+const SERVICIOS_CRM = new Map([
+    ['lena', 'lena'],
+    ['leña', 'lena'],
+    ['cerco', 'cerco'],
+    ['cercos', 'cerco'],
+    ['pergola', 'pergola'],
+    ['pergolas', 'pergola'],
+    ['fogonero', 'fogonero'],
+    ['sector_fogonero', 'fogonero'],
+    ['sector fogonero', 'fogonero'],
+    ['banco', 'bancos'],
+    ['bancos', 'bancos'],
+    ['madera', 'madera'],
+    ['maderas', 'madera'],
+]);
+
+const SERVICIO_PUBLICO = {
+    lena: 'leña',
+    cerco: 'cercos',
+    pergola: 'pérgolas',
+    fogonero: 'sector fogonero',
+    bancos: 'bancos de quebracho',
+    madera: 'productos de madera',
+};
+
+function normalizarServicioCrm(value) {
+    const key = String(value || '')
+        .trim()
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/\p{M}/gu, '');
+    return SERVICIOS_CRM.get(key) || '';
+}
+
+function inferirServicioDesdeIntereses(intereses) {
+    for (const interes of intereses || []) {
+        const servicio = normalizarServicioCrm(interes);
+        if (servicio) return servicio;
+    }
+    return '';
+}
+
+function crmAutoPorLeadStage(stage) {
+    if (stage === 'interesado') {
+        return {
+            potencial: 'caliente',
+            statusCrm: 'seguimiento',
+            urgencia: 'alta',
+            proximoContactoAt: fechaSeguimientoDesdeAhora(24),
+        };
+    }
+    if (stage === 'curioso') {
+        return {
+            potencial: 'frio',
+            statusCrm: 'pendiente_cotizacion',
+            urgencia: 'baja',
+            proximoContactoAt: fechaSeguimientoDesdeAhora(72),
+        };
+    }
+    return {};
 }
 
 /**
@@ -122,7 +214,7 @@ async function ejecutarTurnoVickyGeminiCore(deps, params) {
     }
 
     async function sendTextoSaliente(t) {
-        const s = (t || '').trim();
+        const s = sanitizeCustomerFacingText(t);
         if (!s) return;
         if (esIg) await instagramDm.enviarDmInstagram(instagramPsid, s);
         else await sendBotMessage(remoteJid, { text: s });
@@ -250,12 +342,8 @@ async function ejecutarTurnoVickyGeminiCore(deps, params) {
 
         const ctxLeerPrimero =
             '[LECTURA_OBLIGATORIA] Antes de redactar, integrá en orden: (1) [HILO_CHAT_RECIENTE] si aparece abajo, (2) [CONTEXTO_KONTROLPRO] si aparece abajo (datos de oficina: saldos y fechas de trabajos/entregas), (3) [CONTEXTO_HISTORIAL_CONSULTAS] y [CONTEXTO_SISTEMA] si están en el historial del modelo, (4) [LECTURA_CHAT_PREVIO], y (5) el mensaje actual del cliente. Respondé alineado al tema que venían tratando; no reinicies de cero salvo que el cliente cambie de asunto.';
-        const nomServPub =
-            publicidadLead?.servicio === 'lena'
-                ? 'leña'
-                : publicidadLead?.servicio === 'cerco'
-                  ? 'cercos'
-                  : '';
+        const servicioPublicidad = normalizarServicioCrm(publicidadLead?.servicio);
+        const nomServPub = SERVICIO_PUBLICO[servicioPublicidad] || String(publicidadLead?.servicio || 'el producto consultado');
         const ctxPublicidad = publicidadLead
             ? `[CONTEXTO_PUBLICIDAD] El cliente llegó desde publicidad (${publicidadLead.origen}) sobre ${nomServPub}. NO preguntes qué producto le interesa ni enumeres otros servicios. Respondé directo con precios/info del sistema para ${nomServPub}. Si el mensaje es muy vago, pedí UN dato concreto (medidas, cantidad o zona) para ese producto.`
             : '';
@@ -294,7 +382,7 @@ async function ejecutarTurnoVickyGeminiCore(deps, params) {
         else if (pidePrecio && !tieneMedidasOCantidad) leadStage = 'curioso';
 
         if (leadStage) {
-            actualizarEstadoCliente(remoteJid, { leadStage });
+            actualizarEstadoCliente(remoteJid, { leadStage, ...crmAutoPorLeadStage(leadStage) });
         }
 
         const ctxLead =
@@ -309,7 +397,7 @@ async function ejecutarTurnoVickyGeminiCore(deps, params) {
             const partes = [];
             partes.push({ inlineData: { data: audioClienteBase64, mimeType: audioClienteMime } });
             partes.push({
-                text: `${ctxTiempo}\n${ctxLead}\nEl cliente envió este mensaje de voz. Transcribí internamente TODO lo que dice (de principio a fin, sin cortar) y respondé como Vicky según el contenido completo del audio.`,
+                text: `${ctxTiempo}\n${ctxLead}\nEl cliente envió un mensaje de voz. Usalo solo para entender la consulta y responder como Vicky. PROHIBIDO mostrar transcripciones, resúmenes del audio, razonamiento interno, análisis interno o marcadores operativos al cliente. Respondé directo, natural y útil, sin decir "en el audio dijiste" ni copiar literalmente lo que escuchaste.`,
             });
             contenidoMensaje = partes;
         } else if (imagenBase64) {
@@ -346,30 +434,16 @@ async function ejecutarTurnoVickyGeminiCore(deps, params) {
 
         let respuesta = result.response.text();
 
-        let userParts;
+        let userHistoryParts;
         if (audioClienteBase64) {
-            userParts = [
-                { inlineData: { data: audioClienteBase64, mimeType: audioClienteMime } },
-                { text: text || '[audio]' },
-            ];
+            userHistoryParts = [{ text: text ? `${text}\n[audio de voz procesado internamente]` : '[audio de voz procesado internamente]' }];
         } else if (imagenBase64) {
-            userParts = [
-                { inlineData: { data: imagenBase64, mimeType: imagenMime } },
-                { text: text || '[imagen]' },
-            ];
+            userHistoryParts = [{ text: text ? `${text}\n[imagen procesada internamente]` : '[imagen procesada internamente]' }];
         } else {
-            userParts = [{ text }];
-        }
-        session.chatHistory.push(
-            { role: 'user', parts: userParts },
-            { role: 'model', parts: [{ text: respuesta }] }
-        );
-
-        if (session.chatHistory.length > 20) {
-            session.chatHistory = session.chatHistory.slice(-20);
+            userHistoryParts = [{ text }];
         }
 
-        const cotizMatch = respuesta.match(/\[COTIZACION:(lena|cerco|pergola|fogonero|bancos)\]/i);
+        const cotizMatch = respuesta.match(/\[COTIZACION:(lena|cerco|pergola|fogonero|bancos|madera)\]/i);
         const huboCotizacionMarcador = !!cotizMatch;
         if (cotizMatch) {
             const srv = cotizMatch[1].toLowerCase();
@@ -377,6 +451,10 @@ async function ejecutarTurnoVickyGeminiCore(deps, params) {
             actualizarEstadoCliente(remoteJid, {
                 estado: 'cotizacion_enviada',
                 servicioPendiente: srv,
+                potencial: 'caliente',
+                statusCrm: 'seguimiento',
+                urgencia: 'alta',
+                proximoContactoAt: fechaSeguimientoDesdeAhora(24),
                 textoCotizacion: text,
                 fechaCotizacion: new Date().toISOString(),
                 seguimientoEnviado: false,
@@ -432,7 +510,13 @@ async function ejecutarTurnoVickyGeminiCore(deps, params) {
         if (/\[CONFIRMADO\]/i.test(respuesta)) {
             huboConfirmadoMarcador = true;
             respuesta = respuesta.replace(/\[CONFIRMADO\]/gi, '').trim();
-            actualizarEstadoCliente(remoteJid, { estado: 'confirmado' });
+            actualizarEstadoCliente(remoteJid, {
+                estado: 'confirmado',
+                potencial: 'caliente',
+                statusCrm: 'concreto',
+                urgencia: 'alta',
+                proximoContactoAt: fechaSeguimientoDesdeAhora(6),
+            });
             console.log(`✅ Cliente ${remoteJid} confirmó.`);
         }
 
@@ -568,18 +652,20 @@ async function ejecutarTurnoVickyGeminiCore(deps, params) {
         const crmMatch = respuesta.match(/\[CRM:([^\]]+)\]/i);
         if (crmMatch) {
             const p = crmMatch[1].split('|').map((x) => x.trim());
-            const potRaw = (p[0] || '').toLowerCase();
-            const pot = potRaw === 'frio' ? 'frío' : potRaw;
+            const pot = normalizarPotencialCrm(p[0]);
             const st = (p[1] || '').toLowerCase();
             const urg = (p[2] || '').toLowerCase();
             const zonaCrm = p[3] || '';
             const interCsv = p[4] || '';
             const upd = {};
-            if (['frío', 'tibio', 'caliente'].includes(pot)) upd.potencial = pot;
+            const intereses = interCsv ? normalizarInteresesCrm(interCsv) : [];
+            const servicioCrm = inferirServicioDesdeIntereses(intereses);
+            if (pot) upd.potencial = pot;
             if (['pendiente_cotizacion', 'seguimiento', 'concreto', 'en_obra'].includes(st)) upd.statusCrm = st;
             if (['alta', 'media', 'baja'].includes(urg)) upd.urgencia = urg;
             if (zonaCrm) upd.zona = zonaCrm;
-            if (interCsv) upd.interes = interCsv.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+            if (intereses.length) upd.interes = intereses;
+            if (servicioCrm && !getCliente(remoteJid)?.servicioPendiente) upd.servicioPendiente = servicioCrm;
             if (Object.keys(upd).length) actualizarEstadoCliente(remoteJid, upd);
             respuesta = respuesta.replace(/\[CRM:[^\]]+\]/gi, '').trim();
         }
@@ -614,6 +700,10 @@ async function ejecutarTurnoVickyGeminiCore(deps, params) {
                     texto: txtAg,
                     runAtMs: runMs,
                     origen: 'gemini_agendar',
+                });
+                actualizarEstadoCliente(remoteJid, {
+                    statusCrm: 'seguimiento',
+                    proximoContactoAt: new Date(runMs),
                 });
             }
             respuesta = respuesta.replace(/\[AGENDAR:[^\]]+\]/gi, '').trim();
@@ -668,12 +758,14 @@ async function ejecutarTurnoVickyGeminiCore(deps, params) {
         const fidelizarMatch = respuesta.match(/\[AUDIO_FIDELIZAR:([^\]]+)\]/i);
         let fraseFidelizarEnviada = null;
         if (fidelizarMatch && audioFidelizacionHabilitado) {
-            const fraseFidelizar = fidelizarMatch[1].trim();
+            const fraseFidelizar = sanitizeCustomerFacingText(fidelizarMatch[1]);
             fraseFidelizarEnviada = fraseFidelizar;
             respuesta = respuesta.replace(/\[AUDIO_FIDELIZAR:[^\]]+\]\s*/i, '').trim();
-            await enviarAudioElevenLabs(sendBotMessage, remoteJid, fraseFidelizar);
-            await delay(1000);
-            console.log(`🎙️ Audio fidelización enviado a ${remoteJid}`);
+            if (fraseFidelizar) {
+                await enviarAudioElevenLabs(sendBotMessage, remoteJid, fraseFidelizar);
+                await delay(1000);
+                console.log(`🎙️ Audio fidelización enviado a ${remoteJid}`);
+            }
         } else if (fidelizarMatch) {
             respuesta = respuesta.replace(/\[AUDIO_FIDELIZAR:[^\]]+\]\s*/i, '').trim();
         }
@@ -681,14 +773,14 @@ async function ejecutarTurnoVickyGeminiCore(deps, params) {
         let fraseAudioCorto = null;
         const audioCortoMatch = respuesta.match(/\[AUDIO_CORTO:([^\]]+)\]/i);
         if (audioCortoMatch) {
-            const contenido = audioCortoMatch[1].trim();
+            const contenido = sanitizeCustomerFacingText(audioCortoMatch[1]);
             const palabras = contenido.split(/\s+/).length;
-            if (palabras <= 25) {
+            if (contenido && palabras <= 25) {
                 fraseAudioCorto = contenido;
                 respuesta = respuesta.replace(/\[AUDIO_CORTO:[^\]]+\]\s*/i, '').trim();
             } else {
-                respuesta = respuesta.replace(/\[AUDIO_CORTO:([^\]]+)\]/i, '$1').trim();
-                console.log(`⚠️ AUDIO_CORTO demasiado largo (${palabras} palabras), usando como texto`);
+                respuesta = respuesta.replace(/\[AUDIO_CORTO:[^\]]+\]\s*/i, '').trim();
+                console.log(`⚠️ AUDIO_CORTO inválido o demasiado largo (${palabras} palabras), descartado`);
             }
         }
 
@@ -717,25 +809,7 @@ async function ejecutarTurnoVickyGeminiCore(deps, params) {
         }
 
         if (tieneImagen && audioTtsHabilitado && !audioEnviado) {
-            const textoParaAudio = respuesta
-                .replace(/\[COTIZACION:[^\]]+\]/gi, '')
-                .replace(/\[CONFIRMADO\]/gi, '')
-                .replace(/\[NOMBRE:[^\]]+\]/gi, '')
-                .replace(/\[DIRECCION:[^\]]+\]/gi, '')
-                .replace(/\[ZONA:[^\]]+\]/gi, '')
-                .replace(/\[BARRIO:[^\]]+\]/gi, '')
-                .replace(/\[LOCALIDAD:[^\]]+\]/gi, '')
-                .replace(/\[REFERENCIA:[^\]]+\]/gi, '')
-                .replace(/\[NOTAS_UBICACION:[^\]]+\]/gi, '')
-                .replace(/\[METODO_PAGO:[^\]]+\]/gi, '')
-                .replace(/\[PEDIDO:[^\]]+\]/gi, '')
-                .replace(/\[PEDIDO_LENA:[^\]]+\]/gi, '')
-                .replace(/\[CRM:[^\]]+\]/gi, '')
-                .replace(/\[NOTIFICAR_VENTA:[^\]]+\]/gi, '')
-                .replace(/\[NOTIFICAR_DATOS_ENTREGA\]/gi, '')
-                .replace(/\[AGENDAR:[^\]]+\]/gi, '')
-                .replace(/\[ENTREGA:[^\]]+\]/gi, '')
-                .trim();
+            const textoParaAudio = sanitizeCustomerFacingText(respuesta);
             audioEnviado = await enviarAudioElevenLabs(sendBotMessage, remoteJid, textoParaAudio);
             if (audioEnviado) await delay(800);
         }
@@ -751,12 +825,27 @@ async function ejecutarTurnoVickyGeminiCore(deps, params) {
                 .replace(/^(perfecto[,!]?\s*[^!\n]{0,40}[!.]?\s*)/i, '')
                 .trim();
         }
-        const textoFinal = textoSinSaludo;
+        const textoFinal = sanitizeCustomerFacingText(textoSinSaludo);
         const hayImagen = !!imgMatch;
         const debeEnviarTexto =
             !audioEnviado
             || (audioEnviado && hayImagen)
             || (audioEnviado && audioEnviadoEsSoloAcuseNotaCliente);
+
+        const textoModeloHistorial = sanitizeCustomerFacingText(
+            textoFinal
+            || (audioEnviado ? (fraseAudioCorto || fraseFidelizarEnviada || '[respuesta en audio]') : '')
+            || '[respuesta sin texto visible]'
+        );
+        session.chatHistory.push(
+            { role: 'user', parts: userHistoryParts },
+            { role: 'model', parts: [{ text: textoModeloHistorial }] }
+        );
+
+        if (session.chatHistory.length > 20) {
+            session.chatHistory = session.chatHistory.slice(-20);
+        }
+
         console.log(
             `📝 Texto (${textoFinal.length} chars, audio=${audioEnviado}, img=${hayImagen}, enviar=${debeEnviarTexto}): "${textoFinal.substring(0, 100)}"`
         );
@@ -795,6 +884,7 @@ async function ejecutarTurnoVickyGeminiCore(deps, params) {
                     remoteJid,
                     telefono: telefonoLineaParaFirestore(remoteJid, clienteSync),
                     nombre: clienteSync.nombre || null,
+                    pushName: clienteSync.pushName || null,
                     direccion: clienteSync.direccion || null,
                     zona: clienteSync.zona || null,
                     barrio: clienteSync.barrio || null,
@@ -810,6 +900,7 @@ async function ejecutarTurnoVickyGeminiCore(deps, params) {
                     potencial: clienteSync.potencial || null,
                     statusCrm: clienteSync.statusCrm || null,
                     urgencia: clienteSync.urgencia || null,
+                    proximoContactoAt: fechaFirestoreCrm(clienteSync.proximoContactoAt),
                     interes: Array.isArray(clienteSync.interes) ? clienteSync.interes : [],
                     origenAnuncio: clienteSync.origenAnuncio || null,
                     pedidosAnteriores: clienteSync.pedidosAnteriores || [],
@@ -817,7 +908,7 @@ async function ejecutarTurnoVickyGeminiCore(deps, params) {
                     instagramUserId:
                         clienteSync.instagramUserId || (esIg ? String(instagramPsid) : undefined),
                 };
-                if (lidDigits) fsCliente.whatsappLid = lidDigits;
+                if (clienteSync.whatsappLid || lidDigits) fsCliente.whatsappLid = clienteSync.whatsappLid || lidDigits;
                 firestoreModule.syncCliente(docFs, fsCliente).catch(() => {});
             }
         } else if (!audioEnviado) {

@@ -10,7 +10,7 @@ Operación del panel, redeploy y recuperación de prompts: [`CONFIGURACION_PANEL
 
 | Documento | Campos principales | Escritura | Lectura bot |
 |-----------|-------------------|-----------|-------------|
-| `general` | `delayMinSeg`, `delayMaxSeg`, `modeloGemini`, `frecuenciaAudioFidelizacion`, `tiempoSilencioHumanoHoras`, `botActivo`, **`instagramDmActivo`**, `adminPhone`, **`datosEntregaNotifyPhone`**, horarios atención, `whatsappLabelIdContactarAsesor`, campañas (`campanaDelayMinSeg`, `campanaDelayMaxSeg`, `campanaMaxDestinatarios`, `campanaDescuentoPct`, `campanaRutaFechaTexto`, `campanaRutaPlantilla`), **`geocodeCronActivo`**, **`geocodeCronMaxPorEjecucion`**, **`whatsappGrupoJidAgendaEntregas`**, **`notificarAgendaEntregasGrupoActivo`**, **`colaLenaCapacidadCamionKg`** (default 1000 — barra del panel cola leña), **`colaLenaUmbralDisparoRutaKg`** (default igual a capacidad: al alcanzar esa suma de kg `en_cola`, el bot arma ruta con **Google Directions `optimize:true`** o vecino más cercano y avisa al admin) | Panel → General | Cache ~5 min en la mayoría de campos; **`whatsappGrupoJidAgendaEntregas`** / toggle agenda se leen **sin caché** en cada aviso al grupo (evita JID vacío tras guardar en panel). Hook + sondeo ~50 s |
+| `general` | `delayMinSeg`, `delayMaxSeg`, `modeloGemini`, `frecuenciaAudioFidelizacion`, `tiempoSilencioHumanoHoras`, `botActivo`, **`instagramDmActivo`**, `adminPhone`, **`datosEntregaNotifyPhone`**, horarios atención, `whatsappLabelIdContactarAsesor`, campañas (`campanaDelayMinSeg`, `campanaDelayMaxSeg`, `campanaMaxDestinatarios`, `campanaDescuentoPct`, `campanaRutaFechaTexto`, `campanaRutaPlantilla`), **`geocodeCronActivo`**, **`geocodeCronMaxPorEjecucion`**, **`whatsappGrupoJidAgendaEntregas`**, **`notificarAgendaEntregasGrupoActivo`**, **`colaLenaCapacidadCamionKg`** (default 1000 — barra del panel cola leña), **`colaLenaUmbralDisparoRutaKg`** (default igual a capacidad: al alcanzar esa suma de kg `en_cola`, el bot arma ruta con **Google Directions `optimize:true`** o vecino más cercano y avisa al admin), **`recargarBotAt`**, **`recargarBotMotivo`** | Panel → General / Asistente Vicky | Cache ~5 min en la mayoría de campos; **`botActivo`** y algunos toggles críticos se leen sin caché. Si cambia `recargarBotAt`, el bot recarga runtime (prompts, servicios, promos, skills y config general) por poll o endpoint interno. |
 | `prompts` | `sistemaPrompt`, `sistemaPromptAdmin`, `mensajeBienvenidaTexto`, **`mensajeClienteCierreEntregaHumano`** (WhatsApp al cliente al disparar admin `#final_entrega`), **`instruccionCierreEntregaHumanoGemini`** (bloque extra al modelo mientras `chats/{jid}.cierreEntregaAsistido`) | Panel → Instrucciones AI | Al armar Gemini, el bot **anteponde** (código) el bloque fijo *IDENTIDAD GARDENS WOOD* y luego `sistemaPrompt` (o fallback `SYSTEM_PROMPT` en `bot.js`). Después: bloque servicios + `SYSTEM_PROMPT_SUFIJO_*` (ubicación, nombre, cola leña). Mantener `sistemaPrompt` alineado solo a Gardens Wood (no mezclar otro negocio). |
 
 **Subcolección** `config/prompts/versiones/{id}` — historial de versiones del prompt (panel).
@@ -33,7 +33,7 @@ IDs alineados con el bot y el panel: `lena`, `cerco`, `pergola`, `fogonero`, `ba
 | `marcador` | string | ej. `[IMG:lena]` |
 | `ultimaActualizacion` | timestamp | Panel al guardar |
 
-**Escritura:** panel Precios y servicios. **Lectura bot:** al arranque; se anexa al system prompt como `[DATOS_SERVICIOS_FIRESTORE]`. Tras cambiar precios, **redeploy o restart** de `vicky-bot` en Cloud Run.
+**Escritura:** panel Precios y servicios o Asistente Vicky. **Lectura bot:** al arranque y por recarga runtime cuando `config/general.recargarBotAt` cambia; se anexa al system prompt como `[DATOS_SERVICIOS_FIRESTORE]`. Tras cambiar precios, conviene mantener **redeploy durable** de `vicky-bot` aunque la revisión en marcha ya pueda recargar.
 
 ### `chats/{jid}`
 
@@ -54,11 +54,15 @@ ID de documento: dígitos de línea WhatsApp (sin `@s.whatsapp.net`) **o** `ig:{
 |---------------------|------|-----------------|
 | `telefono` | string (opcional) | Dígitos de la línea (suele coincidir con el id del doc cuando el chat es `@lid` mapeado). |
 | `whatsappLid` | string (opcional) | Identificador LID sin `@lid`; enlaza la ficha `clientes/{tel}` con el hilo real del cliente. |
-| `potencial` | string | `frío`, `tibio`, `caliente` |
+| `remoteJid` | string | JID técnico del hilo (`...@s.whatsapp.net`, `...@lid` o `ig:...`); se usa para abrir el chat correcto desde el panel. |
+| `nombre` | string (opcional) | Nombre comercial/manual del cliente; prioridad visual en CRM. |
+| `pushName` | string (opcional) | Nombre detectado desde WhatsApp o agenda del teléfono. Fallback visual si `nombre` todavía no fue completado. |
+| `potencial` | string | `frio`, `tibio`, `caliente` |
 | `statusCrm` | string | `pendiente_cotizacion`, `seguimiento`, `concreto`, `en_obra` |
 | `urgencia` | string | `alta`, `media`, `baja` |
+| `proximoContactoAt` | Timestamp | Próxima tarea de seguimiento; el bot la crea al cotizar, agendar o detectar intención fuerte. |
 | `zona` | string | Texto libre; filtro campaña `#RUTA` |
-| `interes` | array of string | ej. `pergolas`, `cercos`, `lena`, `mantenimiento`; `#RUTA` puede matchear servicio también por este array |
+| `interes` | array of string | ej. `lena`, `cerco`, `pergola`, `fogonero`, `bancos`, `madera`, `mantenimiento`; el CRM filtra por servicio pendiente o interés, y `#RUTA` puede matchear servicio también por este array |
 | `tipoLenaPreferido` | string (opcional) | `hogar`, `salamandra` o `parrilla`; el panel y filtros de logística; el bot puede actualizarlo al registrar `[PEDIDO_LENA:…\|tipo]` |
 | `lat`, `lng` | number (opcional) | Coordenadas para mapa logístico y `#ruta_geo`; manual, **Guardar** desde pin ámbar en `/logistica-mapa`, o lote **`npm run geocode:clientes`** en el repo del bot (`scripts/geocodificar-clientes-direccion.js`). En la ficha **Cliente**, **Ver en mapa** abre **Logística — mapa** centrado (`/logistica-mapa?lat=…&lng=…&tel=…`). El mapa enlaza `tel` de la URL con el pin del CRM comparando **misma línea** (p. ej. `351…` en el query vs `549351…` en el id de Firestore: últimos 10 u 8 dígitos; Instagram `ig:` solo por id exacto). **Siempre dibuja el pin azul del cliente del enlace** aunque los filtros lo oculten. **Dedupe** por clave canónica (últimos 10 dígitos en WhatsApp) para un solo azul y sin ámbar/cola naranja encima. La cola y la búsqueda por tel resuelven con dígitos completos o clave corta. En esa pantalla, los pins **azul** (CRM) y **ámbar** (aprox. por dirección) se **arrastran**; los cambios quedan pendientes hasta **Guardar cambios** en la barra del mapa (o **Descartar movimientos** para volver a la última versión guardada). Recién entonces se escriben `lat`/`lng` en `clientes/{id}` y se **limpian** los parámetros `lat`/`lng`/`tel` de la URL (desaparece el refuerzo violeta si aún estaba). **Quitar pin:** botón rojo **Eliminar pin** en el **panel “Pin seleccionado”** (al hacer **clic** en un pin azul en `/logistica-mapa`). En Next.js no hay que poner `useSearchParams()` en las dependencias del efecto que redibuja Leaflet: reinstancia el objeto y dispara `clearLayers` en casi cada render (rompe arrastre, panel y popups). El mapa usa claves estables (`lat`/`lng`/`tel` como strings, `geocodeOkKey` solo para geocodificaciones OK) y `pendingByTel` solo por ref. |
 | `direccion` | string (opcional) | Calle y número / dirección de entrega; `[DIRECCION:…]` o panel |
@@ -69,7 +73,9 @@ ID de documento: dígitos de línea WhatsApp (sin `@s.whatsapp.net`) **o** `ig:{
 
 El geocodificador (cron / `npm run geocode:clientes`) arma la búsqueda con **dirección + barrio + localidad + zona + referencia + notas** (truncado) + Córdoba, Argentina.
 
-El bot puede rellenar CRM con marcadores internos en Gemini: `[CRM:…]`, `[DIRECCION:…]`, `[ZONA:…]`, `[BARRIO:…]`, `[LOCALIDAD:…]`, `[REFERENCIA:…]`, `[NOTAS_UBICACION:…]` (se eliminan antes de enviar al cliente).
+El bot puede rellenar CRM con marcadores internos en Gemini: `[CRM:…]`, `[DIRECCION:…]`, `[ZONA:…]`, `[BARRIO:…]`, `[LOCALIDAD:…]`, `[REFERENCIA:…]`, `[NOTAS_UBICACION:…]` (se eliminan antes de enviar al cliente). El CRM comercial es general para todos los servicios; la logística de leña queda separada en `consultasLena` / `/logistica-zonas` y `colaLena`.
+
+**Identidad en CRM:** el panel muestra `nombre` o `pushName` y prioriza `telefono` como teléfono visible. Si solo existe `@lid`, lo muestra como identificador técnico, no como número telefónico. La búsqueda del CRM incluye `nombre`, `pushName`, `telefono`, `remoteJid` y `whatsappLid`.
 
 **Chats `@lid`:** el id interno del chat no es el celular. El bot carga `lid_mapeo/*` al arranque, aprende LID→tel desde `contacts.upsert` de Baileys, y escribe la ficha en `clientes/{dígitos línea}`. Asociación manual admin: WhatsApp `!vicky #p lidmap LID_DIGITS TEL_DOC` (ej. `543516170743`) o `npm run seed:lid-mapeo -- LID TEL` en el repo del bot.
 
@@ -114,7 +120,9 @@ Polilínea de reparto / corredor para campaña **geo** (`#ruta_geo` en WhatsApp 
 
 ### `mensajes_programados/{id}`
 
-Mensajes a enviar en una fecha/hora (`runAt`), creados por lógica del bot (p. ej. marcador `[AGENDAR:…]`). Campos típicos: `jid`, `texto` o prompt, `runAt`, `estado` (`pendiente` \| `enviado` \| `error`), `creadoEn`, `origen`. El cron HTTP del servicio Cloud Run procesa pendientes y actualiza estado.
+Mensajes a enviar en una fecha/hora (`runAt`), creados por lógica del bot (p. ej. marcador `[AGENDAR:…]`) o por el dashboard. Campos típicos: `jid`, `texto`, `runAt`, `estado` (`pendiente` \| `enviado` \| `error`), `creadoEn`, `origen`. El cron HTTP del servicio Cloud Run procesa pendientes y actualiza estado.
+
+**Contrato del bot:** el cron lee `texto` y `runAt` como `Timestamp`; `runAtMs` por sí solo no dispara envíos.
 
 ### `entregas_agenda/{id}`
 
@@ -168,6 +176,81 @@ Pedidos pequeños de leña (≤200 kg por marcador); **fuente operativa del bot*
 **Escritura bot:** `syncColaLena` en lotes (≤400 docs por tanda), `merge: true`. No borra documentos de clientes que ya no están en el array en memoria (solo actualiza el snapshot enviado). Tras cada cambio de cola: GCS + sync; al conectar/reconectar WhatsApp, si hay pedidos, se vuelve a sincronizar.
 
 **Disparo “zona cercana” (`config/general`):** con `colaLenaUmbralClusterZonaKg` (ej. 800) y prefijo común entre el primer token de `zona` o `dirección` de cada pedido (`colaLenaClusterZonaMinPrefijo`, default 6), el bot arma ruta aunque no se haya llegado a `colaLenaUmbralDisparoRutaKg`. Poné **`colaLenaUmbralClusterZonaKg: 0`** para desactivar. Tras armar la ruta: plantilla `colaLenaPlantillaWAClienteRutaArmada` a cada cliente (`{nombre}`, `{zona}`, `{kg}`), aviso al admin y copia opcional a `colaLenaTelefonoAvisoRutaCopia` (solo dígitos, ej. Juan).
+
+### `consultasLena/{consultaId}`
+
+Consultas manuales de clientes interesados en leña que todavía **no** son pedidos confirmados ni parte de `colaLena`. Las carga Vicky desde el panel cuando un cliente pide menos de un despacho mínimo o queda pendiente de agrupar por zona.
+
+| Campo | Tipo | Notas |
+|-------|------|--------|
+| `remoteJid` | string | JID WhatsApp del cliente (`…@s.whatsapp.net`). |
+| `tel` | string | Dígitos del teléfono; se usa para cruzar con `clientes/{tel}`. |
+| `nombre` | string | Nombre visible en el panel. |
+| `zona` | string | Zona libre para agrupar consultas y calcular umbral. |
+| `cantidadKg` | number | Consulta manual, validada en panel entre 1 y 499 kg. |
+| `notas` | string \| null | Texto interno opcional. |
+| `fechaConsulta` | Timestamp | Fecha de alta. |
+| `estado` | string | `pendiente` → `zona_lista` / `admin_notificado` → `confirmado` → `enviado`. |
+| `fechaNotificacionAdmin`, `fechaConfirmacion`, `fechaEnvio` | Timestamp opcional | Auditoría del flujo del panel. |
+| `origen` | string | ej. `dashboard`, `dashboard_clientes`, `dashboard_cliente_detalle`. |
+| `creadoEn`, `actualizadoEn` | Timestamp | Auditoría. |
+
+La página **Zonas & Consultas** (`/logistica-zonas`) agrupa estados activos (`pendiente`, `zona_lista`, `admin_notificado`, `confirmado`) por `zona`, usa `config/general.colaLenaUmbralClusterZonaKg` (default 800) y escribe en `mensajes_programados` para avisar al admin o a clientes. No reemplaza `colaLena`: cuando el pedido ya está confirmado para despacho, el flujo operativo sigue en `colaLena` / agenda.
+
+### `vicky_skills/{skillId}`
+
+Skills internas de Vicky versionadas en Git (`apps/bot/vicky-skills`) y editables desde el panel **Instrucciones AI → Skills Vicky**.
+
+| Campo | Tipo | Notas |
+|-------|------|--------|
+| `id` | string | `vendedor`, `funciones-dashboard`, etc. |
+| `nombre` | string | Nombre visible e inyectado al prompt. |
+| `contenido` | string | Markdown con reglas operativas para el bot. |
+| `activo` | bool | Si es `false`, el bot no la inyecta. |
+| `orden` | number | Orden de inyección en el system prompt. |
+| `archivo` | string opcional | Archivo fuente en Git. |
+| `origen` | string | `git`, `dashboard`, etc. |
+| `actualizadoEn` | Timestamp | Auditoría. |
+
+Subcolección `vicky_skills/{skillId}/versiones/{versionId}`: snapshots guardados por el dashboard antes de actualizar una skill.
+
+El bot lee `vicky_skills/*` al armar Gemini. Si Firestore no tiene skills, usa fallback local desde `apps/bot/vicky-skills/*.md`.
+
+### Asistente Vicky: `assistant_runs`, `assistant_changes`, `change_requests`
+
+El dashboard monta un chat flotante global y escribe cambios operativos mediante APIs server-side (`apps/dashboard/src/app/api/assistant/*`) con Firebase Admin SDK. El usuario siempre confirma antes de aplicar.
+
+`assistant_runs/{runId}`:
+
+| Campo | Tipo | Notas |
+|-------|------|-------|
+| `message` | string | Pedido original del usuario. |
+| `origin` | string | `dashboard`, `whatsapp_admin`, `cursor_chat` o `code`. |
+| `user` | map | `uid`, `email`, `role`, `nombre`. |
+| `status` | string | `planned`, `needs_more_detail`, `applying`, `applied`, `failed`, `rolled_back`. |
+| `operations` | array | Cambios validados: destino Firestore, descripción, `before`/`after`, flags `requiresBotReload` / `requiresDeploy`. |
+| `sync` | map | Estado de Firestore, recarga bot, GitHub Actions/Cloud Build y Cloud Run. |
+| `createdAt`, `updatedAt`, `appliedAt`, `rolledBackAt` | Timestamp | Auditoría. |
+
+`assistant_changes/{changeId}`:
+
+| Campo | Tipo | Notas |
+|-------|------|-------|
+| `runId` | string | Relación con `assistant_runs`. |
+| `operation` | map | Operación aplicada. |
+| `before`, `after` | map/null | Snapshot para auditoría y rollback. |
+| `rollbackStatus` | string | `available` o `rolled_back`. |
+| `appliedBy`, `rolledBackBy` | map | Usuario del panel. |
+
+`change_requests/{runId}`:
+
+| Campo | Tipo | Notas |
+|-------|------|-------|
+| `message`, `origin`, `status`, `operationCount` | varios | Cola unificada de cambios para dashboard, WhatsApp admin, Cursor/chat o código. |
+| `createdBy` | map | Usuario u origen. |
+| `createdAt`, `updatedAt` | Timestamp | Auditoría. |
+
+**Reglas:** lectura para usuarios autenticados del panel; escritura directa desde cliente denegada. Las APIs del dashboard aplican cambios con Admin SDK y registran auditoría.
 
 ### `adminWaSesion/{docId}`
 

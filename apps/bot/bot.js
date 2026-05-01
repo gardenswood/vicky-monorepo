@@ -57,6 +57,7 @@ const VICKY_GEMINI_MODEL_DEFAULT = 'gemini-3.1-flash-lite-preview';
 const firestoreModule = require('./firestore-module');
 const { ejecutarCronGeocodificacionClientes } = require('./cron-geocode-clientes');
 const { ejecutarTurnoVickyGeminiCore } = require('./vicky-gemini-turn');
+const { sanitizeCustomerFacingText } = require('./customer-facing-sanitize');
 const instagramDmMod = require('./instagram-dm');
 const kontrolproAdmin = require('./kontrolpro-admin');
 
@@ -349,11 +350,33 @@ const server = http.createServer((req, res) => {
         });
     }
 
+    if (req.method === 'POST' && urlPathOnly === '/internal/reload/runtime') {
+        let raw = '';
+        req.on('data', (c) => { raw += c; });
+        return req.on('end', async () => {
+            const secretConfigured = vickyCronSecretTrimmed();
+            const authed = isCronRequestAuthorized(req) || cronJsonBodyMatchesSecret(raw);
+            if (!secretConfigured || !authed) {
+                logCronAuth401(req, urlPathOnly, {
+                    bodySecretTried: process.env.VICKY_CRON_ALLOW_BODY_SECRET === '1',
+                });
+                return send(401, 'unauthorized');
+            }
+            try {
+                const changed = await recargarRuntimeVickyDesdeFirestore({ force: true, motivo: 'http' });
+                send(200, JSON.stringify({ ok: true, reloaded: changed }), 'application/json; charset=utf-8');
+            } catch (e) {
+                send(500, JSON.stringify({ ok: false, error: e.message }), 'application/json; charset=utf-8');
+            }
+        });
+    }
+
     if (
         req.method === 'GET' &&
         (urlPathOnly === '/internal/cron/programados' ||
             urlPathOnly === '/internal/cron/weather' ||
-            urlPathOnly === '/internal/cron/geocode-clientes')
+            urlPathOnly === '/internal/cron/geocode-clientes' ||
+            urlPathOnly === '/internal/reload/runtime')
     ) {
         return send(
             405,
@@ -419,7 +442,7 @@ server.listen(PORT, () => {
     );
     console.log(`${bar}\n`);
     console.log(
-        `📡 HTTP puerto ${PORT} (GET /health, GET /health/whatsapp JSON, GET /legal/politica-privacidad, POST /internal/cron/* Bearer, GET|POST /webhooks/instagram)`
+        `📡 HTTP puerto ${PORT} (GET /health, GET /health/whatsapp JSON, GET /legal/politica-privacidad, POST /internal/cron/* Bearer, POST /internal/reload/runtime Bearer, GET|POST /webhooks/instagram)`
     );
     const cs = vickyCronSecretTrimmed();
     if (cs.length) {
@@ -772,11 +795,11 @@ REGLAS DE COMPORTAMIENTO
 
 MARCADORES INTERNOS (no visibles para el cliente; van al final del pensamiento de respuesta o en línea aparte):
 • [DIRECCION:…] [ZONA:…] [BARRIO:…] [LOCALIDAD:…] [REFERENCIA:…] [NOTAS_UBICACION:…] — guardan ficha en CRM/mapas (reglas 19–20b).
-• [CRM:potencial|statusCrm|urgencia|zona|intereses] — potencial: frío|tibio|caliente · statusCrm: pendiente_cotizacion|seguimiento|concreto|en_obra · urgencia: alta|media|baja · zona: barrio/zona libre · intereses: lista separada por comas (pergolas,decks,cercos,lena,mantenimiento). Ej: [CRM:tibio|seguimiento|media|Villa Allende|cercos,lena]
+• [CRM:potencial|statusCrm|urgencia|zona|intereses] — potencial: frio|tibio|caliente · statusCrm: pendiente_cotizacion|seguimiento|concreto|en_obra · urgencia: alta|media|baja · zona: barrio/zona libre · intereses: lista separada por comas para cualquier producto/servicio activo (lena,cerco,pergola,fogonero,bancos,madera,mantenimiento). Ej: [CRM:tibio|seguimiento|media|Villa Allende|cerco,pergola]. Si hay cotización o intención fuerte, el sistema además crea una próxima tarea de seguimiento para que no se escape el lead.
 • [NOTIFICAR_VENTA:resumen breve del pedido o intención de compra] — cuando el cliente pide datos bancarios/CBU, confirma pedido fuerte o muestra intención de cierre. NO le pases CBU, alias ni datos de transferencia vos: decile que en breve un asesor se comunica con los datos. Incluí despedida tipo "en breve un asesor te contacta".
 • [AGENDAR:YYYY-MM-DD|texto del recordatorio] — si el cliente pide que lo contacten otro día (ej. "escribime el lunes"). Una línea; fecha ISO y texto corto para el mensaje programado.
 • [ENTREGA:YYYY-MM-DD|HH:mm o --|título breve] — cuando coordinás fecha (y si aplica hora) de entrega u obra: queda en el **calendario del panel** (Agenda de entregas). Usá \`--\` (dos guiones) en hora si es solo el día. Ej: [ENTREGA:2026-04-07|09:00|1 tn leña Iván] o [ENTREGA:2026-04-07|--|Entrega leña coordinada].
-11c. AUDIO DE FIDELIZACIÓN: Cuando el contexto indique [CONTEXTO_AUDIO:], incluí al inicio de tu respuesta el marcador [AUDIO_FIDELIZAR:frase] con una frase corta y cálida (máx 12 palabras) que suene humana y genere confianza. La frase va SOLO en el marcador, no la repitas en el texto escrito. Variá siempre la frase según la conversación. Ejemplos: "¡Me alegra que estés mirando esto! Es una excelente opción.", "Cualquier duda que tengas me avisás, estoy acá.", "Trabajamos con mucha gente de la zona, van a quedar re conformes." La pregunta debe estar relacionada con lo que se estuvo hablando. Ejemplos según contexto:
+11c. AUDIO DE FIDELIZACIÓN: Cuando el contexto indique [CONTEXTO_AUDIO:], incluí al inicio de tu respuesta el marcador [AUDIO_FIDELIZAR:frase] con una frase EXTREMADAMENTE corta y cálida (máx 10 palabras) que suene humana y genere confianza. La frase va SOLO en el marcador, no la repitas en el texto escrito. PROHIBIDO incluir NÚMEROS, PRECIOS, CANTIDADES o MEDIDAS en este audio. Variá siempre la frase según la conversación. Ejemplos: "¡Me alegra que estés mirando esto! Es una excelente opción.", "Cualquier duda que tengas me avisás, estoy acá.", "Trabajamos con mucha gente de la zona." La pregunta debe estar relacionada con lo que se estuvo hablando. Ejemplos según contexto:
     - Después de dar precio de leña: "¿Te la enviamos? ¿Cuántos kilos necesitás?"
     - Después de dar info de cercos: "¿Ya tenés las medidas del espacio? ¿Es para el frente o el fondo de tu casa?"
     - Después de dar info de pérgolas: "¿Tenés alguna medida en mente o querés que te ayudemos a calcular el espacio?"
@@ -784,7 +807,7 @@ MARCADORES INTERNOS (no visibles para el cliente; van al final del pensamiento d
     - En general: "¿Conocés nuestro showroom en Villa Allende?" (solo si no fue mencionado antes) o "¿Tenés alguna otra consulta?"
     NUNCA termines una respuesta sin pregunta. La pregunta cierra siempre el mensaje de Vicky.
 11d. Pregunta de cierre: NO enumeres en cada mensaje la lista de servicios (leña, cercos, pérgolas, fogonero, etc.) salvo que el cliente pregunte explícitamente qué venden o sea una consulta totalmente genérica sin tema. Preferí una sola pregunta corta atada al tema actual, por ejemplo "¿En qué más te puedo ayudar?" o algo concreto sobre medidas, zona o cantidad.
-11e. Si el sistema envía [CONTEXTO_PUBLICIDAD], el cliente llegó desde un anuncio de leña o de cercos. NO preguntes qué producto le interesa ni ofrezcas el menú completo de servicios; respondé directo sobre ese producto con la información del sistema.
+11e. Si el sistema envía [CONTEXTO_PUBLICIDAD], el cliente llegó desde un anuncio de un producto/servicio concreto. NO preguntes qué producto le interesa ni ofrezcas el menú completo de servicios; respondé directo sobre ese producto con la información del sistema.
 
 TÉCNICAS DE VENTA (aplicar naturalmente, sin sonar forzado):
 
@@ -833,7 +856,7 @@ T7. SIN VISITA TÉCNICA A DOMICILIO (no ofrecer): **No** propongas ni ofrezcas v
 13. No incluyas el marcador de imagen si ya lo enviaste antes en la misma conversación.
 14. Formateá los precios con puntos separadores de miles (ej: $290.000, no $290000).
 15. Cuando hagás un presupuesto con metros o cantidad, mostrá el cálculo detallado (cantidad × precio = total).
-16. Cuando enviés una cotización con total (presupuesto completo), agregá al FINAL del mensaje el marcador: [COTIZACION:servicio] donde servicio es lena, cerco, pergola, fogonero o bancos. Ejemplo: [COTIZACION:cerco]
+16. Cuando enviés una cotización con total (presupuesto completo), agregá al FINAL del mensaje el marcador: [COTIZACION:servicio] donde servicio es lena, cerco, pergola, fogonero, bancos o madera. Ejemplo: [COTIZACION:cerco]
     ESPECIAL CERCOS — PDF: Cuando hagas un presupuesto de CERCOS con datos completos (metros, precio, altura), además de [COTIZACION:cerco] agregá al FINAL el marcador:
     [PDF_CERCO:metros|precioUnit|alturaM|descuentoPct]
     Ejemplos:
@@ -867,23 +890,20 @@ T7. SIN VISITA TÉCNICA A DOMICILIO (no ofrecer): **No** propongas ni ofrezcas v
 22. Cuando el cliente confirme un pedido o una obra y ya tenés todos los datos, registrá el pedido al FINAL con: [PEDIDO:servicio|descripcion_breve] — por ejemplo: [PEDIDO:lena|500kg quebracho] o [PEDIDO:cerco|12m a 2m de alto]
 25. AUDIOS QUE MANDA EL CLIENTE: Cuando el cliente manda un audio o nota de voz, procesá su contenido normalmente. Además, al principio de tu respuesta incluí esta línea especial (y solo esta línea al inicio): [AUDIO_CORTO:frase]
     REGLAS DE ORO para el AUDIO_CORTO — para que suene LO MÁS HUMANA POSIBLE:
-    • Frases cortas y naturales. Como si le hablarás a un amigo, no a un cliente formal.
+    • Frases EXTREMADAMENTE cortas y naturales (máximo 1 oración). Como si le hablarás a un amigo.
+    • PROHIBIDO incluir NÚMEROS, PRECIOS, CANTIDADES o MEDIDAS. No leas ningún número porque la voz no los pronuncia bien.
     • Sin listas, sin puntos, sin asteriscos, sin guiones. Solo texto corrido.
-    • Sin tecnicismos ni abreviaciones (decí "metros" no "mt", "kilogramos" no "kg").
-    • Usá comas para pausas naturales, no saltos de línea.
-    • Variá siempre las frases — nunca dos audios iguales.
-    • Máximo 2-3 oraciones. Breve y cálido.
+    • Variá siempre las frases — nunca dos audios iguales. Evitá ser repetitiva.
+    • NO des explicaciones detalladas ni resúmenes extensos por audio. Dejá TODOS los detalles, precios y datos técnicos exclusivamente para el texto escrito.
     La frase del AUDIO_CORTO depende del tipo de respuesta:
-    a) Si el cliente pregunta de forma VAGA sobre un producto o servicio: respondé con una pregunta cálida y conversacional para entender qué necesita. Sin datos del catálogo todavía.
-       Ejemplo pérgola: "Hola [nombre], qué bueno que consultes. Contame un poco, ¿es para tener sombra en el jardín, para guardar el auto, o para armar una zona de asado? Así te oriento mejor."
-       Ejemplo cerco: "Hola [nombre], perfecto. ¿Es para delimitar el frente, el fondo, o un lateral? Y más o menos, ¿cuántos metros serían?"
-    b) Si la respuesta NO es un presupuesto pero SÍ tiene info concreta: frase corta, cálida y variada. Máximo 15 palabras.
-       Ejemplos: "Sí, [nombre], ya te mando todo." / "Dale, anotá esto." / "Bueno, te cuento."
-    c) Si la respuesta ES un presupuesto o cotización: resumí solo el pedido y el total, en forma conversacional.
-       SOLO: qué producto, cuánto, y el total. Terminá con una pregunta de cierre natural.
-       Ejemplo: "Mirá, para los quince metros de cerco a un ochenta de alto, el total te quedaría en dos millones cien mil pesos. ¿Te parece bien?"
+    a) Si el cliente pregunta de forma VAGA sobre un producto o servicio: respondé con una pregunta cálida y general. Sin datos del catálogo ni números.
+       Ejemplo: "Hola, qué bueno que consultes. Contame un poco más de tu idea así te oriento mejor."
+    b) Si la respuesta NO es un presupuesto pero SÍ tiene info concreta: frase súper corta y cálida. Máximo 10 palabras.
+       Ejemplos: "Ahí te paso toda la info por escrito." / "Dale, te dejo los detalles acá abajo."
+    c) Si la respuesta ES un presupuesto o cotización: NO menciones totales ni cantidades en el audio. Solo avisa que le pasás el presupuesto.
+       Ejemplo: "Mirá, ahí te armé el presupuesto detallado por escrito. ¿Te parece bien?"
        NUNCA leas campos de datos a completar (nombre, dirección, etc.) — eso va solo en texto.
-    Variá siempre el tono, las palabras y el ritmo para que no suene siempre igual.
+    Variá siempre el tono y las palabras para que no suene siempre igual.
 24. FOTOS QUE MANDA EL CLIENTE: Si el cliente manda una foto, analizala en el contexto de nuestros servicios y productos:
     - Si es un espacio exterior (patio, jardín, terreno): estimá visualmente si aplica pérgola, cerco, sector fogonero o bancos. Comentá lo que ves y preguntale qué tiene en mente.
     - Si es una foto de madera o producto: identificá de qué se trata y ofrecé el producto similar de nuestro catálogo.
@@ -966,6 +986,8 @@ let lastAgendaGrupoSkipLogMs = 0;
 /** Firestore + Gemini + delays: solo la primera vez; reconexiones solo recrean el socket. */
 let vickyBootstrapHecho = false;
 let vickyGeminiModel = null;
+let vickyRuntimeReloadPollStarted = false;
+let vickyRuntimeReloadKey = '';
 /** Cliente Gemini reutilizado para recargar `systemInstruction` tras #g + OK sin reiniciar el proceso. */
 let vickyGoogleGenAI = null;
 const vickyRuntimeCfg = {
@@ -1938,6 +1960,9 @@ function reactivarVickyTrasSalirAdmin(remoteJid) {
 // Mapeo @lid → teléfono real, construido desde contactos sincronizados por Baileys
 // Claves: lid numérico (sin @lid). Valores: teléfono (sin @s.whatsapp.net)
 const lidToPhone = new Map();
+// Nombres observados desde la agenda/perfil de WhatsApp. No crea CRM por sí solo;
+// se usa como fallback cuando ese contacto realmente escribe o ya existe como lead.
+const waContactNameByJid = new Map();
 /** Defaults si no hay `config/general` en Firestore (panel / operación). */
 const COLA_LENA_DEFAULTS = {
     capacidadCamionKg: 1000,
@@ -2099,6 +2124,50 @@ function debeDispararRutaColaLena(totalKg, pedidosEnCola, cfg) {
         return { disparar: true, motivo: 'umbral_zona_cercana' };
     }
     return { disparar: false, motivo: '' };
+}
+
+function totalKgPedidosCola(pedidos) {
+    return (Array.isArray(pedidos) ? pedidos : []).reduce((sum, p) => sum + (Number(p?.cantidadKg) || 0), 0);
+}
+
+function seleccionarPedidosRutaColaLena(pedidosEnCola, cfg) {
+    const pedidos = (Array.isArray(pedidosEnCola) ? pedidosEnCola : [])
+        .filter((p) => p && p.estado === 'en_cola');
+    const total = totalKgPedidosCola(pedidos);
+    if (total <= 0 || pedidos.length === 0) return { disparar: false, motivo: '', pedidos: [], totalKg: total };
+    if (total >= cfg.umbralDisparoRutaKg) {
+        return { disparar: true, motivo: 'umbral_camion', pedidos, totalKg: total };
+    }
+
+    const ucz = cfg.umbralClusterZonaKg;
+    if (!(ucz != null && Number.isFinite(ucz) && ucz >= 100 && ucz < cfg.umbralDisparoRutaKg)) {
+        return { disparar: false, motivo: '', pedidos: [], totalKg: total };
+    }
+
+    const grupos = [];
+    for (const pedido of pedidos) {
+        const token = tokenZonaClusterCola(pedido);
+        if (!token) continue;
+        let grupo = grupos.find((g) => tokensMismoCorredorCola(g.token, token, cfg.clusterZonaMinPrefijo));
+        if (!grupo) {
+            grupo = { token, pedidos: [] };
+            grupos.push(grupo);
+        }
+        grupo.pedidos.push(pedido);
+    }
+
+    const candidatos = grupos
+        .map((g) => ({ ...g, totalKg: totalKgPedidosCola(g.pedidos) }))
+        .filter((g) => g.pedidos.length >= 2 && g.totalKg >= ucz)
+        .sort((a, b) => b.totalKg - a.totalKg);
+
+    if (candidatos.length === 0) return { disparar: false, motivo: '', pedidos: [], totalKg: total };
+    return {
+        disparar: true,
+        motivo: 'umbral_zona_cercana',
+        pedidos: candidatos[0].pedidos,
+        totalKg: candidatos[0].totalKg,
+    };
 }
 
 /**
@@ -2469,15 +2538,17 @@ async function agregarAColaLena(remoteJid, nombre, direccion, zona, cantidadKg, 
     const cfgCola = await obtenerConfigColaLena();
     const totalActual = totalKgEnCola();
     const pedidosPendientes = colaLena.filter(p => p.estado === 'en_cola');
-    const { disparar, motivo } = debeDispararRutaColaLena(totalActual, pedidosPendientes, cfgCola);
+    const seleccionRuta = seleccionarPedidosRutaColaLena(pedidosPendientes, cfgCola);
+    const { disparar, motivo } = seleccionRuta;
     const extraZona = cfgCola.umbralClusterZonaKg != null
         ? ` · zona cercana ≥${cfgCola.umbralClusterZonaKg}kg si el corredor coincide`
         : '';
     console.log(`🪵 Total en cola: ${totalActual}kg (camión ref. ${cfgCola.capacidadCamionKg}kg · disparo ${cfgCola.umbralDisparoRutaKg}kg${extraZona})`);
 
     if (disparar) {
-        console.log(`🚚 Ruta (${motivo}): ${totalActual}kg. Optimizando orden de visitas…`);
-        const enriquecidos = await enriquecerPedidosColaConCoordenadasCRM(pedidosPendientes);
+        console.log(`🚚 Ruta (${motivo}): ${seleccionRuta.totalKg}kg de ${totalActual}kg en cola. Optimizando orden de visitas…`);
+        const pedidosParaRuta = seleccionRuta.pedidos.length ? seleccionRuta.pedidos : pedidosPendientes;
+        const enriquecidos = await enriquecerPedidosColaConCoordenadasCRM(pedidosParaRuta);
         const metaRuta = { metrosTotales: /** @type {number | null} */ (null) };
         const pedidosOrdenados = await optimizarRutaEntregasColaLeña(enriquecidos, metaRuta);
         const rutaGrupoId = `rg_${Date.now()}`;
@@ -2503,7 +2574,10 @@ async function agregarAColaLena(remoteJid, nombre, direccion, zona, cantidadKg, 
             };
         });
 
-        pedidosPendientes.forEach(p => { p.estado = 'notificado'; });
+        const telsRuta = new Set(pedidosParaRuta.map((p) => getTel(p.remoteJid)).filter(Boolean));
+        pedidosPendientes.forEach((p) => {
+            if (telsRuta.has(getTel(p.remoteJid))) p.estado = 'notificado';
+        });
         await saveColaLenaGCS();
 
         await notificarAdminRutaLeñaConCopia(paraMensajeAdmin, metaRuta.metrosTotales, motivo, cfgCola);
@@ -3280,6 +3354,7 @@ async function syncClienteFirestoreDesdeHistorialLocal(jid) {
             remoteJid: jid,
             telefono: telefonoLineaParaFirestore(jid, clienteSync),
             nombre: clienteSync.nombre || null,
+            pushName: clienteSync.pushName || null,
             direccion: clienteSync.direccion || null,
             zona: clienteSync.zona || null,
             barrio: clienteSync.barrio || null,
@@ -3295,6 +3370,7 @@ async function syncClienteFirestoreDesdeHistorialLocal(jid) {
             potencial: clienteSync.potencial || null,
             statusCrm: clienteSync.statusCrm || null,
             urgencia: clienteSync.urgencia || null,
+            proximoContactoAt: fechaFirestoreCrm(clienteSync.proximoContactoAt),
             interes: Array.isArray(clienteSync.interes) ? clienteSync.interes : [],
             origenAnuncio: clienteSync.origenAnuncio || null,
             pedidosAnteriores: clienteSync.pedidosAnteriores || [],
@@ -3302,7 +3378,7 @@ async function syncClienteFirestoreDesdeHistorialLocal(jid) {
             instagramUserId: clienteSync.instagramUserId
                 || (esIgDest ? String(docId).replace(/^ig:/, '') : undefined),
     };
-    if (lidDigits) payloadHist.whatsappLid = lidDigits;
+    if (clienteSync.whatsappLid || lidDigits) payloadHist.whatsappLid = clienteSync.whatsappLid || lidDigits;
     await firestoreModule.syncCliente(docId, payloadHist).catch(() => {});
 }
 
@@ -3844,23 +3920,8 @@ function normalizarTextoParaAudio(texto) {
 async function generarAudioElevenLabs(texto) {
     if (!ELEVENLABS_API_KEY || !ELEVENLABS_VOICE_ID) return null;
     try {
-        // Limpiar marcadores del texto antes de convertir a audio
-        const textoLimpio = normalizarTextoParaAudio(
-            texto
-                .replace(/\[IMG:[^\]]+\]/gi, '')
-                .replace(/\[COTIZACION:[^\]]+\]/gi, '')
-                .replace(/\[CONFIRMADO\]/gi, '')
-                .replace(/\[NOMBRE:[^\]]+\]/gi, '')
-                .replace(/\[DIRECCION:[^\]]+\]/gi, '')
-                .replace(/\[ZONA:[^\]]+\]/gi, '')
-        .replace(/\[BARRIO:[^\]]+\]/gi, '')
-        .replace(/\[LOCALIDAD:[^\]]+\]/gi, '')
-        .replace(/\[REFERENCIA:[^\]]+\]/gi, '')
-        .replace(/\[NOTAS_UBICACION:[^\]]+\]/gi, '')
-                .replace(/\[METODO_PAGO:[^\]]+\]/gi, '')
-                .replace(/\[PEDIDO:[^\]]+\]/gi, '')
-                .replace(/\[PEDIDO_LENA:[^\]]+\]/gi, '')
-        ).trim();
+        // Ultima barrera: ElevenLabs nunca debe leer marcadores ni texto interno.
+        const textoLimpio = normalizarTextoParaAudio(sanitizeCustomerFacingText(texto)).trim();
 
         if (!textoLimpio) return null;
 
@@ -4317,6 +4378,13 @@ function docIdClienteFirestore(remoteJid, cliente) {
     return getTel(remoteJid);
 }
 
+function fechaFirestoreCrm(value) {
+    if (!value) return null;
+    if (value instanceof Date) return Number.isFinite(value.getTime()) ? value : null;
+    const ms = Date.parse(String(value));
+    return Number.isFinite(ms) ? new Date(ms) : null;
+}
+
 function asegurarCliente(remoteJid) {
     const tel = getTel(remoteJid);
     const esIg = String(remoteJid || '').startsWith('ig:');
@@ -4324,9 +4392,11 @@ function asegurarCliente(remoteJid) {
         clientesHistorial[tel] = {
             audioIntroEnviado: false,
             nombre: null,
+            pushName: null,
             remoteJid,
             // Guardar teléfono legible si es @s.whatsapp.net, sino el ID @lid limpio
             telefono: remoteJid.includes('@s.whatsapp.net') ? tel : null,
+            whatsappLid: remoteJid.endsWith('@lid') ? tel : null,
             canal: esIg ? 'instagram' : undefined,
             instagramUserId: esIg ? tel.replace(/^ig:/, '') : undefined,
             estado: 'nuevo',
@@ -4349,6 +4419,10 @@ function asegurarCliente(remoteJid) {
     } else {
         // Asegurar que tenga los campos nuevos si era un registro viejo
         if (!clientesHistorial[tel].remoteJid) clientesHistorial[tel].remoteJid = remoteJid;
+        if (clientesHistorial[tel].pushName === undefined) clientesHistorial[tel].pushName = null;
+        if (remoteJid.endsWith('@lid') && !clientesHistorial[tel].whatsappLid) {
+            clientesHistorial[tel].whatsappLid = tel;
+        }
         if (!clientesHistorial[tel].estado) clientesHistorial[tel].estado = 'nuevo';
         if (clientesHistorial[tel].seguimientoEnviado === undefined) clientesHistorial[tel].seguimientoEnviado = false;
         if (clientesHistorial[tel].handoffEnviado === undefined) clientesHistorial[tel].handoffEnviado = false;
@@ -4395,6 +4469,21 @@ function actualizarEstadoCliente(remoteJid, datos) {
     }
 
     saveHistorialGCS().catch(() => {});
+}
+
+function clienteTieneAvanceComercial(cliente) {
+    if (!cliente || typeof cliente !== 'object') return false;
+    if (cliente.estado && cliente.estado !== 'nuevo') return true;
+    return Boolean(
+        cliente.servicioPendiente ||
+        cliente.textoCotizacion ||
+        cliente.statusCrm ||
+        cliente.potencial ||
+        cliente.leadStage ||
+        cliente.handoffEnviado ||
+        cliente.proximoContactoAt ||
+        (Array.isArray(cliente.pedidosAnteriores) && cliente.pedidosAnteriores.length > 0)
+    );
 }
 
 // Construye el contexto previo para inyectar en Gemini cuando el cliente vuelve
@@ -5613,6 +5702,9 @@ async function recargarVickyGeminiSystemPrompt() {
         const promocionesConfig = await firestoreModule.getPromocionesConfig();
         const promocionesSuffix = firestoreModule.buildPromocionesPromptSuffix(promocionesConfig);
         if (promocionesSuffix) full += promocionesSuffix;
+        const vickySkills = await firestoreModule.getVickySkills();
+        const vickySkillsSuffix = firestoreModule.buildVickySkillsPromptSuffix(vickySkills);
+        if (vickySkillsSuffix) full += vickySkillsSuffix;
         full += SYSTEM_PROMPT_SUFIJO_UBICACION_MARCADORES;
         full += SYSTEM_PROMPT_SUFIJO_NOMBRE_SALUDO;
         full += SYSTEM_PROMPT_SUFIJO_COLA_LENA;
@@ -5627,6 +5719,93 @@ async function recargarVickyGeminiSystemPrompt() {
         console.error('❌ recargarVickyGeminiSystemPrompt:', e.message);
         return false;
     }
+}
+
+function timestampRuntimeKey(value) {
+    if (!value) return '';
+    if (typeof value.toMillis === 'function') return String(value.toMillis());
+    if (typeof value.toDate === 'function') return String(value.toDate().getTime());
+    if (value instanceof Date) return String(value.getTime());
+    if (typeof value === 'number' || typeof value === 'string') return String(value);
+    return '';
+}
+
+function aplicarConfigGeneralRuntime(configGeneral) {
+    const delayMinS = Number(configGeneral.delayMinSeg);
+    const delayMaxS = Number(configGeneral.delayMaxSeg);
+    const minEscS = Math.max(26, Number.isFinite(delayMinS) ? delayMinS : 26);
+    let maxEscS = Number.isFinite(delayMaxS) ? delayMaxS : 34;
+    if (maxEscS < minEscS + 2) maxEscS = minEscS + 8;
+    vickyRuntimeCfg.DELAY_MIN = minEscS * 1000;
+    vickyRuntimeCfg.DELAY_MAX = maxEscS * 1000;
+
+    if (!String(process.env.GEMINI_MODEL || '').trim()) {
+        vickyRuntimeCfg.MODEL_GEMINI = String(configGeneral.modeloGemini || '').trim() || VICKY_GEMINI_MODEL_DEFAULT;
+    }
+    const freqFidelRaw = parseInt(configGeneral.frecuenciaAudioFidelizacion, 10);
+    vickyRuntimeCfg.FIDELIZAR_CADA = (Number.isFinite(freqFidelRaw) && freqFidelRaw >= 18)
+        ? Math.min(99, freqFidelRaw)
+        : 0;
+    vickyRuntimeCfg.BOT_ACTIVO = configGeneral.botActivo !== false;
+
+    const labelHandoff = String(
+        configGeneral.whatsappLabelIdContactarAsesor
+        || process.env.WHATSAPP_LABEL_ID_CONTACTAR_ASESOR
+        || ''
+    ).trim();
+    vickyRuntimeCfg.WHATSAPP_LABEL_ID_CONTACTAR_ASESOR = labelHandoff;
+    vickyRuntimeCfg.ADMIN_PHONE_DIGITS = String(configGeneral.adminPhone || process.env.ADMIN_PHONE || '').replace(/\D/g, '');
+
+    const panelDe = configGeneral.datosEntregaNotifyPhone;
+    const tienePanelDe = panelDe != null && String(panelDe).replace(/\D/g, '').length > 0;
+    const rawDatosEntrega = tienePanelDe
+        ? panelDe
+        : (process.env.VICKY_DATOS_ENTREGA_NOTIFY_PHONE || '5493512956376');
+    vickyRuntimeCfg.DATOS_ENTREGA_NOTIFY_DIGITS = normalizarDigitosNotifOperacion(rawDatosEntrega);
+
+    vickyRuntimeCfg.GRUPO_JID_AGENDA_ENTREGAS = normalizarJidGrupoAgendaEntregas(
+        configGeneral.whatsappGrupoJidAgendaEntregas || process.env.WHATSAPP_GRUPO_JID_AGENDA_ENTREGAS
+    );
+    vickyRuntimeCfg.NOTIFICAR_AGENDA_GRUPO_ACTIVO = configGeneral.notificarAgendaEntregasGrupoActivo !== false;
+
+    const cMin = Number(configGeneral.campanaDelayMinSeg);
+    const cMax = Number(configGeneral.campanaDelayMaxSeg);
+    vickyRuntimeCfg.CAMPANA_DELAY_MIN_MS = Math.max(5000, (Number.isFinite(cMin) ? cMin : 15) * 1000);
+    vickyRuntimeCfg.CAMPANA_DELAY_MAX_MS = Math.max(
+        vickyRuntimeCfg.CAMPANA_DELAY_MIN_MS,
+        (Number.isFinite(cMax) ? cMax : 20) * 1000
+    );
+    vickyRuntimeCfg.CAMPANA_MAX = Math.min(200, Math.max(5, parseInt(configGeneral.campanaMaxDestinatarios, 10) || 40));
+    vickyRuntimeCfg.CAMPANA_DESC_PCT = Number.isFinite(Number(configGeneral.campanaDescuentoPct))
+        ? Number(configGeneral.campanaDescuentoPct)
+        : 10;
+}
+
+async function recargarRuntimeVickyDesdeFirestore({ force = false, motivo = 'poll' } = {}) {
+    if (!firestoreModule.isAvailable()) return false;
+    const configGeneral = await firestoreModule.getConfigGeneral({ bypassCache: true });
+    const key = timestampRuntimeKey(configGeneral.recargarBotAt)
+        || timestampRuntimeKey(configGeneral.ultimaActualizacion)
+        || timestampRuntimeKey(configGeneral.actualizadoEn);
+    if (!force && key && key === vickyRuntimeReloadKey) return false;
+    aplicarConfigGeneralRuntime(configGeneral);
+    const okPrompt = await recargarVickyGeminiSystemPrompt();
+    if (key) vickyRuntimeReloadKey = key;
+    console.log(`🔄 Runtime Vicky recargado desde Firestore (${motivo}, prompt=${okPrompt ? 'ok' : 'sin-cambio'}).`);
+    return true;
+}
+
+function iniciarRuntimeReloadPoller() {
+    if (vickyRuntimeReloadPollStarted) return;
+    vickyRuntimeReloadPollStarted = true;
+    const rawMs = parseInt(String(process.env.VICKY_RUNTIME_RELOAD_POLL_MS || '').trim(), 10);
+    const pollMs = Number.isFinite(rawMs) ? Math.max(15000, rawMs) : 60000;
+    setInterval(() => {
+        recargarRuntimeVickyDesdeFirestore({ motivo: 'poll' }).catch((e) => {
+            console.warn('⚠️ Runtime reload poll:', e.message);
+        });
+    }, pollMs);
+    console.log(`🔁 Runtime reload poll activo cada ${Math.round(pollMs / 1000)}s.`);
 }
 
 async function connectToWhatsApp(isReconnect = false) {
@@ -5662,6 +5841,12 @@ async function connectToWhatsApp(isReconnect = false) {
         if (promocionesSuffix) {
             SYSTEM_PROMPT_ACTIVO += promocionesSuffix;
             console.log('🏷️ Bloque PROMOCIONES_RESTRICCIONES_FIRESTORE anexado al system prompt.');
+        }
+        const vickySkills = await firestoreModule.getVickySkills();
+        const vickySkillsSuffix = firestoreModule.buildVickySkillsPromptSuffix(vickySkills);
+        if (vickySkillsSuffix) {
+            SYSTEM_PROMPT_ACTIVO += vickySkillsSuffix;
+            console.log('🧠 Bloque VICKY_SKILLS_FIRESTORE anexado al system prompt.');
         }
         SYSTEM_PROMPT_ACTIVO += SYSTEM_PROMPT_SUFIJO_UBICACION_MARCADORES;
         SYSTEM_PROMPT_ACTIVO += SYSTEM_PROMPT_SUFIJO_NOMBRE_SALUDO;
@@ -5782,6 +5967,11 @@ async function connectToWhatsApp(isReconnect = false) {
         }
 
         vickyBootstrapHecho = true;
+        vickyRuntimeReloadKey = timestampRuntimeKey(configGeneral.recargarBotAt)
+            || timestampRuntimeKey(configGeneral.ultimaActualizacion)
+            || timestampRuntimeKey(configGeneral.actualizadoEn)
+            || '';
+        iniciarRuntimeReloadPoller();
     }
 
     if (firestoreModule.isAvailable() && colaLena.length > 0) {
@@ -5855,6 +6045,13 @@ async function connectToWhatsApp(isReconnect = false) {
             const lidId = contact.id?.endsWith('@lid')
                 ? contact.id.replace(/@lid$/, '')
                 : (contact.lid ? contact.lid.replace(/@lid$/, '') : null);
+            const nombreContacto = contact.notify || contact.name || null;
+            if (nombreContacto && contact.id) {
+                waContactNameByJid.set(contact.id, nombreContacto);
+            }
+            if (nombreContacto && lidId) {
+                waContactNameByJid.set(`${lidId}@lid`, nombreContacto);
+            }
 
             // ── Mapeo @lid → teléfono ──
             // Caso A: contacto @s.whatsapp.net con campo lid
@@ -5867,6 +6064,8 @@ async function connectToWhatsApp(isReconnect = false) {
                     const c = clientesHistorial[lid];
                     if (c && !c.telefono) {
                         c.telefono = phone;
+                        c.whatsappLid = lid;
+                        if (!c.pushName && nombreContacto) c.pushName = nombreContacto;
                         guardadosPendientes = true;
                         const digits = soloDigitosTel(phone);
                         if (digits.length >= 8) {
@@ -5876,6 +6075,8 @@ async function connectToWhatsApp(isReconnect = false) {
                                     remoteJid: c.remoteJid || `${lid}@lid`,
                                     telefono: digits,
                                     whatsappLid: lid,
+                                    pushName: c.pushName || nombreContacto || null,
+                                    nombre: c.nombre || null,
                                 })
                                 .catch(() => {});
                         }
@@ -5892,6 +6093,8 @@ async function connectToWhatsApp(isReconnect = false) {
                     const c = clientesHistorial[lid];
                     if (c && !c.telefono) {
                         c.telefono = phone;
+                        c.whatsappLid = lid;
+                        if (!c.pushName && nombreContacto) c.pushName = nombreContacto;
                         guardadosPendientes = true;
                         const digits = soloDigitosTel(phone);
                         if (digits.length >= 8) {
@@ -5901,6 +6104,8 @@ async function connectToWhatsApp(isReconnect = false) {
                                     remoteJid: c.remoteJid || `${lid}@lid`,
                                     telefono: digits,
                                     whatsappLid: lid,
+                                    pushName: c.pushName || nombreContacto || null,
+                                    nombre: c.nombre || null,
                                 })
                                 .catch(() => {});
                         }
@@ -5911,13 +6116,15 @@ async function connectToWhatsApp(isReconnect = false) {
             // ── Guardar nombre/pushName para clientes existentes ──
             // contact.notify = pushName (nombre configurado en WhatsApp)
             // contact.name   = nombre guardado en agenda del teléfono del admin
-            const nombreContacto = contact.notify || contact.name || null;
             if (nombreContacto && lidId) {
                 const cliente = clientesHistorial[lidId];
                 if (cliente && !cliente.pushName) {
                     cliente.pushName = nombreContacto;
                     nuevosNombre++;
                     guardadosPendientes = true;
+                    if (clienteTieneAvanceComercial(cliente)) {
+                        syncClienteFirestoreDesdeHistorialLocal(cliente.remoteJid || `${lidId}@lid`).catch(() => {});
+                    }
                 }
             }
         }
@@ -8004,13 +8211,17 @@ Ejemplos de cómo traducir instrucciones:
 
             // --- GUARDAR PUSHNAME (nombre WhatsApp del cliente) ---
             // msg.pushName es el nombre que el cliente tiene configurado en su WhatsApp.
-            // Lo guardamos como fallback para identificar clientes @lid sin teléfono.
-            if (!msg.key.fromMe && msg.pushName) {
+            // Si la agenda local ya tenía un nombre para ese JID, lo usamos como fallback mejor.
+            if (!msg.key.fromMe) {
                 const clientePush = asegurarCliente(remoteJid);
-                if (!clientePush.pushName && msg.pushName) {
-                    clientePush.pushName = msg.pushName;
+                const nombreDetectado = waContactNameByJid.get(remoteJid) || msg.pushName || null;
+                if (!clientePush.pushName && nombreDetectado) {
+                    clientePush.pushName = nombreDetectado;
                     saveHistorialGCS().catch(() => {});
-                    console.log(`📛 pushName guardado para ${remoteJid}: "${msg.pushName}"`);
+                    if (clienteTieneAvanceComercial(clientePush)) {
+                        syncClienteFirestoreDesdeHistorialLocal(remoteJid).catch(() => {});
+                    }
+                    console.log(`📛 pushName guardado para ${remoteJid}: "${nombreDetectado}"`);
                 }
             }
 

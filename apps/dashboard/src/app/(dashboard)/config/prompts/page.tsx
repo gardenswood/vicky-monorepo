@@ -16,13 +16,23 @@ interface PromptVersion {
   previewTexto: string
 }
 
+interface VickySkillDoc {
+  id: string
+  nombre: string
+  contenido: string
+  activo: boolean
+  orden: number
+}
+
 export default function PromptsPage() {
   const [sistemaPrompt, setSistemaPrompt] = useState('')
   const [sistemaPromptAdmin, setSistemaPromptAdmin] = useState('')
   const [mensajeBienvenida, setMensajeBienvenida] = useState('')
   const [mensajeClienteCierreEntrega, setMensajeClienteCierreEntrega] = useState('')
   const [instruccionCierreEntregaGemini, setInstruccionCierreEntregaGemini] = useState('')
-  const [activeTab, setActiveTab] = useState<'principal' | 'admin' | 'bienvenida' | 'cierreEntrega'>('principal')
+  const [activeTab, setActiveTab] = useState<'principal' | 'admin' | 'bienvenida' | 'cierreEntrega' | 'skills'>('principal')
+  const [skills, setSkills] = useState<VickySkillDoc[]>([])
+  const [activeSkillId, setActiveSkillId] = useState('vendedor')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
@@ -34,6 +44,7 @@ export default function PromptsPage() {
   useEffect(() => {
     loadPrompts()
     loadVersions()
+    loadSkills()
   }, [])
 
   async function loadPrompts() {
@@ -78,10 +89,34 @@ export default function PromptsPage() {
     } catch {}
   }
 
+  async function loadSkills() {
+    try {
+      const snap = await getDocs(query(collection(db, 'vicky_skills'), orderBy('orden', 'asc')))
+      const data: VickySkillDoc[] = snap.docs.map((d) => ({
+        id: d.id,
+        nombre: d.data().nombre || d.id,
+        contenido: d.data().contenido || '',
+        activo: d.data().activo !== false,
+        orden: Number(d.data().orden ?? 100),
+      }))
+      setSkills(data)
+      if (data.length > 0) setActiveSkillId(data[0].id)
+    } catch {
+      setError('Error al cargar las skills de Vicky')
+    }
+  }
+
   async function savePrompts() {
     setSaving(true)
     setError('')
     try {
+      if (activeTab === 'skills') {
+        await saveSkills()
+        setSaved(true)
+        setTimeout(() => setSaved(false), 3000)
+        return
+      }
+
       const promptRef = doc(db, 'config', 'prompts')
       const currentSnap = await getDoc(promptRef)
       const currentVersion = currentSnap.exists() ? (currentSnap.data().version || 0) : 0
@@ -121,6 +156,25 @@ export default function PromptsPage() {
     }
   }
 
+  async function saveSkills() {
+    for (const skill of skills) {
+      const skillRef = doc(db, 'vicky_skills', skill.id)
+      await setDoc(
+        doc(db, 'vicky_skills', skill.id, 'versiones', `${Date.now()}`),
+        {
+          ...skill,
+          fecha: serverTimestamp(),
+          origen: 'dashboard',
+        }
+      )
+      await setDoc(skillRef, {
+        ...skill,
+        actualizadoEn: serverTimestamp(),
+        origen: 'dashboard',
+      }, { merge: true })
+    }
+  }
+
   async function restoreVersion(versionId: string) {
     try {
       const snap = await getDoc(doc(db, 'config', 'prompts', 'versiones', versionId))
@@ -145,7 +199,9 @@ export default function PromptsPage() {
         ? sistemaPromptAdmin
         : activeTab === 'bienvenida'
           ? mensajeBienvenida
-          : `${mensajeClienteCierreEntrega}\n\n---\n\n${instruccionCierreEntregaGemini}`
+          : activeTab === 'skills'
+            ? skills.find((s) => s.id === activeSkillId)?.contenido ?? ''
+            : `${mensajeClienteCierreEntrega}\n\n---\n\n${instruccionCierreEntregaGemini}`
 
   const setCurrentContent =
     activeTab === 'principal'
@@ -154,7 +210,9 @@ export default function PromptsPage() {
         ? setSistemaPromptAdmin
         : activeTab === 'bienvenida'
           ? setMensajeBienvenida
-          : () => {}
+          : activeTab === 'skills'
+            ? (value: string) => setSkills((current) => current.map((s) => s.id === activeSkillId ? { ...s, contenido: value } : s))
+            : () => {}
 
   return (
     <div className="h-screen flex flex-col overflow-hidden">
@@ -220,6 +278,11 @@ export default function PromptsPage() {
               label: 'Cierre entrega',
               desc: 'Tras humano (#final_entrega)',
             },
+            {
+              id: 'skills',
+              label: 'Skills Vicky',
+              desc: 'Vendedor y funciones dashboard',
+            },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -242,6 +305,62 @@ export default function PromptsPage() {
           {loading ? (
             <div className="h-full flex items-center justify-center">
               <div className="animate-spin w-8 h-8 border-2 border-brand-600 border-t-transparent rounded-full" />
+            </div>
+          ) : activeTab === 'skills' ? (
+            <div className="h-full flex flex-col min-h-0">
+              <div className="bg-white border-b border-slate-200 px-4 py-3 flex items-center gap-2">
+                {skills.length === 0 ? (
+                  <p className="text-sm text-slate-500">
+                    No hay skills cargadas en Firebase. Ejecutá <code className="text-brand-700">npm run config:import</code> desde el bot.
+                  </p>
+                ) : (
+                  skills.map((skill) => (
+                    <button
+                      key={skill.id}
+                      onClick={() => setActiveSkillId(skill.id)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium ${
+                        activeSkillId === skill.id
+                          ? 'bg-brand-50 text-brand-700 border border-brand-200'
+                          : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      {skill.nombre}
+                    </button>
+                  ))
+                )}
+              </div>
+              <div className="flex-1 min-h-0">
+                {previewMode ? (
+                  <div className="h-full overflow-y-auto p-6">
+                    <div className="max-w-3xl mx-auto bg-white rounded-xl border border-slate-200 p-6">
+                      <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                        <Eye className="w-4 h-4 text-slate-400" /> Preview skill
+                      </h3>
+                      <pre className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed font-mono">
+                        {currentContent}
+                      </pre>
+                    </div>
+                  </div>
+                ) : (
+                  <MonacoEditor
+                    height="100%"
+                    defaultLanguage="markdown"
+                    value={currentContent}
+                    onChange={(value: string | undefined) => setCurrentContent(value || '')}
+                    theme="vs-light"
+                    options={{
+                      wordWrap: 'on',
+                      minimap: { enabled: false },
+                      lineNumbers: 'off',
+                      fontSize: 13,
+                      fontFamily: '"Fira Code", "Cascadia Code", monospace',
+                      padding: { top: 20, bottom: 20 },
+                      scrollBeyondLastLine: false,
+                      renderLineHighlight: 'none',
+                    }}
+                  />
+                )}
+              </div>
             </div>
           ) : activeTab === 'cierreEntrega' ? (
             previewMode ? (

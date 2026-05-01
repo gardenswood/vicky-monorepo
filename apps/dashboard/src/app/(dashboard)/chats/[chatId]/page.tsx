@@ -2,7 +2,7 @@
 export const dynamic = 'force-dynamic'
 
 import { useEffect, useRef, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams } from 'next/navigation'
 import {
   collection,
   query,
@@ -11,6 +11,7 @@ import {
   doc,
   updateDoc,
   Timestamp,
+  getDoc,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import {
@@ -23,9 +24,12 @@ import {
   FileText,
   ExternalLink,
   PanelRightOpen,
+  ThumbsUp,
+  ThumbsDown,
 } from 'lucide-react'
 import { format } from 'date-fns'
-import { cn, ESTADO_LABELS, ESTADO_COLORS } from '@/lib/utils'
+import { es } from 'date-fns/locale'
+import { cn, SERVICIO_LABELS, ESTADO_LABELS, ESTADO_COLORS, formatRelative, getTelFromJid } from '@/lib/utils'
 import { LeadDrawer } from '@/components/LeadDrawer'
 
 interface Mensaje {
@@ -36,6 +40,7 @@ interface Mensaje {
   timestamp: Date
   marcadores?: string[]
   servicio?: string
+  feedback?: 'good' | 'bad'
 }
 
 export default function ChatDetailPage() {
@@ -50,19 +55,30 @@ export default function ChatDetailPage() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
 
   useEffect(() => {
-    // Load chat info (we use the 'clientes' collection for full lead info to pass to the drawer)
-    // Wait, the chat document might not have all lead info. Let's fetch the client document.
-    const tel = jid.replace('@s.whatsapp.net', '')
+    const tel = getTelFromJid(jid)
     const clienteRef = doc(db, 'clientes', tel)
     const unsubCliente = onSnapshot(clienteRef, (snap) => {
       if (snap.exists()) {
-        setChatInfo({ tel: snap.id, ...snap.data() })
+        const d = snap.data()
+        setChatInfo({
+          jid,
+          tel,
+          nombre: d.nombre,
+          estado: d.estado,
+          servicioPendiente: d.servicioPendiente,
+          humanoAtendiendo: d.humanoAtendiendo,
+          direccion: d.direccion,
+          zona: d.zona,
+          metodoPago: d.metodoPago,
+          pedidosAnteriores: d.pedidosAnteriores || [],
+          ...d
+        })
       } else {
         // Fallback to chat info if client doesn't exist yet
         const chatRef = doc(db, 'chats', jid)
         getDoc(chatRef).then(chatSnap => {
           if (chatSnap.exists()) {
-             setChatInfo({ tel, ...chatSnap.data() })
+             setChatInfo({ tel, jid, ...chatSnap.data() })
           }
         })
       }
@@ -80,6 +96,7 @@ export default function ChatDetailPage() {
         timestamp: d.data().timestamp?.toDate() ?? new Date(),
         marcadores: d.data().marcadores,
         servicio: d.data().servicio,
+        feedback: d.data().feedback,
       }))
       setMensajes(data)
       setLoading(false)
@@ -107,6 +124,15 @@ export default function ChatDetailPage() {
       console.error(err)
     } finally {
       setToggling(false)
+    }
+  }
+
+  async function handleFeedback(msgId: string, feedback: 'good' | 'bad') {
+    try {
+      const msgRef = doc(db, 'chats', jid, 'mensajes', msgId)
+      await updateDoc(msgRef, { feedback })
+    } catch (err) {
+      console.error('Error al guardar feedback:', err)
     }
   }
 
@@ -233,7 +259,7 @@ export default function ChatDetailPage() {
                   key={msg.id}
                   className={cn('flex animate-in', msg.direccion === 'saliente' ? 'justify-end' : 'justify-start')}
                 >
-                  <div className="max-w-[85%] sm:max-w-[75%]">
+                  <div className="max-w-[85%] sm:max-w-[75%] flex flex-col group">
                     {msg.direccion === 'entrante' && (
                       <div className="flex items-center gap-1 mb-1 ml-1">
                         <User className="w-3 h-3 text-slate-500" />
@@ -249,7 +275,7 @@ export default function ChatDetailPage() {
                       </div>
                     )}
                     <div className={cn(
-                      'px-4 py-2.5 rounded-2xl shadow-sm relative group',
+                      'px-4 py-2.5 rounded-2xl shadow-sm relative',
                       msg.direccion === 'saliente' 
                         ? 'bg-[#d9fdd3] text-slate-800 rounded-tr-sm' 
                         : 'bg-white text-slate-800 rounded-tl-sm'
@@ -276,6 +302,34 @@ export default function ChatDetailPage() {
                         </span>
                       </div>
                     </div>
+                    {/* Botones de Feedback para mensajes salientes (del bot) */}
+                    {msg.direccion === 'saliente' && (
+                      <div className={cn(
+                        "flex justify-end items-center gap-1.5 mt-1 mr-2 transition-opacity",
+                        msg.feedback ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus-within:opacity-100"
+                      )}>
+                        <button
+                          onClick={() => handleFeedback(msg.id, 'good')}
+                          className={cn(
+                            "p-1.5 rounded-full transition-all hover:bg-green-100 hover:scale-110 active:scale-95",
+                            msg.feedback === 'good' ? 'bg-green-100 text-green-600' : 'text-slate-400 hover:text-green-600'
+                          )}
+                          title="Bien respondido"
+                        >
+                          <ThumbsUp className={cn("w-4 h-4", msg.feedback === 'good' && "fill-current")} />
+                        </button>
+                        <button
+                          onClick={() => handleFeedback(msg.id, 'bad')}
+                          className={cn(
+                            "p-1.5 rounded-full transition-all hover:bg-red-100 hover:scale-110 active:scale-95",
+                            msg.feedback === 'bad' ? 'bg-red-100 text-red-600' : 'text-slate-400 hover:text-red-600'
+                          )}
+                          title="Mal respondido"
+                        >
+                          <ThumbsDown className={cn("w-4 h-4", msg.feedback === 'bad' && "fill-current")} />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}

@@ -38,7 +38,55 @@ export function getInitials(name?: string): string {
 }
 
 export function getTelFromJid(jid: string): string {
-  return jid.replace('@s.whatsapp.net', '').replace('@g.us', '')
+  return getJidDigits(jid)
+}
+
+export function isLidJid(jid?: string | null): boolean {
+  return String(jid || '').endsWith('@lid')
+}
+
+export function getJidDigits(jid?: string | null): string {
+  return String(jid || '')
+    .replace('@s.whatsapp.net', '')
+    .replace('@g.us', '')
+    .replace('@lid', '')
+}
+
+export interface ClienteIdentityLike {
+  tel?: string
+  telefono?: string | null
+  nombre?: string | null
+  pushName?: string | null
+  remoteJid?: string | null
+  whatsappLid?: string | null
+}
+
+export function getDisplayName(cliente: ClienteIdentityLike): string {
+  const raw = (cliente.nombre || cliente.pushName || '').trim()
+  return raw || 'Sin nombre'
+}
+
+export function getDisplayPhone(cliente: ClienteIdentityLike): string {
+  const telefono = String(cliente.telefono || '').replace(/\D/g, '')
+  if (telefono.length >= 8) return telefono
+
+  const remoteJid = String(cliente.remoteJid || '')
+  if (remoteJid.endsWith('@s.whatsapp.net')) {
+    const digits = getJidDigits(remoteJid).replace(/\D/g, '')
+    if (digits.length >= 8) return digits
+  }
+
+  const docTel = String(cliente.tel || '').replace(/\D/g, '')
+  if (!isLidJid(remoteJid) && docTel.length >= 8) return docTel
+
+  return ''
+}
+
+export function getIdentitySecondary(cliente: ClienteIdentityLike): string {
+  const remoteJid = String(cliente.remoteJid || '')
+  if (isLidJid(remoteJid)) return `WhatsApp LID ${cliente.whatsappLid || getJidDigits(remoteJid)}`
+  if (remoteJid.startsWith('ig:')) return `Instagram ${remoteJid.replace(/^ig:/, '')}`
+  return remoteJid || String(cliente.tel || '')
 }
 
 export const SERVICIO_LABELS: Record<string, string> = {
@@ -60,12 +108,12 @@ export const SERVICIO_COLORS: Record<string, string> = {
 }
 
 export const ESTADO_LABELS: Record<string, string> = {
-  capturados: 'Leads capturados',
-  clasificando: 'Clasificando leads',
-  cualificados: 'Leads cualificados',
-  vendiendo: 'Vendiendo',
-  ganado: 'Ganado',
-  perdido: 'Perdido',
+  capturados: '📥 Leads capturados',
+  clasificando: '⚙️ Clasificando leads',
+  cualificados: '🎯 Leads cualificados',
+  vendiendo: '💬 Vendiendo',
+  ganado: '✅ Ganado',
+  perdido: '❌ Perdido',
 }
 
 export const ESTADO_COLORS: Record<string, string> = {

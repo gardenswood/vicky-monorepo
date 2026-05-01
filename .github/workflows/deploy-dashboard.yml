@@ -1,0 +1,30 @@
+name: Deploy Vicky Dashboard
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - 'apps/dashboard/**'
+      - '.github/workflows/deploy-dashboard.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_WIF_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Build and deploy dashboard
+        working-directory: apps/dashboard
+        run: gcloud builds submit --config=cloudbuild.yaml --project=webgardens-8655d

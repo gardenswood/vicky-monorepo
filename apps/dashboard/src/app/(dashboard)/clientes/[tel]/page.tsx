@@ -3,20 +3,32 @@ export const dynamic = 'force-dynamic'
 
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { doc, onSnapshot, updateDoc, serverTimestamp } from 'firebase/firestore'
+import { addDoc, collection, doc, onSnapshot, query, updateDoc, where, serverTimestamp } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import {
   ArrowLeft, Phone, MapPin, Package, Clock, Edit2, Save, X,
-  MessageSquare, ExternalLink, DollarSign,
+  MessageSquare, ExternalLink, DollarSign, Plus, AlertTriangle,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { SERVICIO_LABELS, ESTADO_COLORS, ESTADO_LABELS, cn, formatRelative } from '@/lib/utils'
+import {
+  SERVICIO_LABELS,
+  ESTADO_COLORS,
+  ESTADO_LABELS,
+  cn,
+  formatRelative,
+  getDisplayName,
+  getDisplayPhone,
+  getIdentitySecondary,
+} from '@/lib/utils'
 import Link from 'next/link'
 
 interface Cliente {
   tel: string
   remoteJid: string
+  telefono?: string
+  pushName?: string
+  whatsappLid?: string
   nombre?: string
   direccion?: string
   zona?: string
@@ -36,6 +48,30 @@ interface Cliente {
   consentimientoDifusion?: boolean
 }
 
+interface ConsultaLenaActiva {
+  id: string
+  zona: string
+  cantidadKg: number
+  estado: string
+  notas?: string
+}
+
+function optionalDate(value: unknown): Date | undefined {
+  if (!value) return undefined
+  if (value instanceof Date) return value
+  if (typeof value === 'object' && 'toDate' in value && typeof value.toDate === 'function') return value.toDate()
+  if (typeof value === 'string' || typeof value === 'number') {
+    const date = new Date(value)
+    return Number.isFinite(date.getTime()) ? date : undefined
+  }
+  return undefined
+}
+
+function normalizePotencial(value?: string): string | undefined {
+  const normalized = (value ?? '').trim().toLowerCase().normalize('NFD').replace(/\p{M}/gu, '')
+  return normalized || undefined
+}
+
 export default function ClienteDetailPage() {
   const { tel } = useParams<{ tel: string }>()
   const router = useRouter()
@@ -46,6 +82,10 @@ export default function ClienteDetailPage() {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<Partial<Cliente>>({})
   const [saving, setSaving] = useState(false)
+  const [consultasLena, setConsultasLena] = useState<ConsultaLenaActiva[]>([])
+  const [consultaModal, setConsultaModal] = useState(false)
+  const [consultaForm, setConsultaForm] = useState({ cantidadKg: '', zona: '', notas: '' })
+  const [savingConsulta, setSavingConsulta] = useState(false)
 
   useEffect(() => {
     const unsub = onSnapshot(doc(db, 'clientes', telDecoded), (snap) => {
@@ -54,6 +94,9 @@ export default function ClienteDetailPage() {
         const c: Cliente = {
           tel: telDecoded,
           remoteJid: d.remoteJid || `${telDecoded}@s.whatsapp.net`,
+          telefono: d.telefono,
+          pushName: d.pushName,
+          whatsappLid: d.whatsappLid,
           nombre: d.nombre,
           direccion: d.direccion,
           zona: d.zona,
@@ -64,15 +107,15 @@ export default function ClienteDetailPage() {
             ...p,
             fecha: (p.fecha as { toDate?: () => Date })?.toDate?.(),
           })),
-          fechaUltimoContacto: d.fechaUltimoContacto?.toDate(),
-          fechaPrimerContacto: d.fechaPrimerContacto?.toDate(),
+          fechaUltimoContacto: optionalDate(d.fechaUltimoContacto),
+          fechaPrimerContacto: optionalDate(d.fechaPrimerContacto),
           notas: d.notas,
           audioIntroEnviado: d.audioIntroEnviado,
-          potencial: d.potencial,
+          potencial: normalizePotencial(d.potencial),
           statusCrm: d.statusCrm,
           urgencia: d.urgencia,
           interes: Array.isArray(d.interes) ? d.interes : [],
-          proximoContactoAt: d.proximoContactoAt?.toDate(),
+          proximoContactoAt: optionalDate(d.proximoContactoAt),
           consentimientoDifusion: d.consentimientoDifusion,
         }
         setCliente(c)
@@ -95,6 +138,27 @@ export default function ClienteDetailPage() {
     return () => unsub()
   }, [telDecoded])
 
+  useEffect(() => {
+    const q = query(collection(db, 'consultasLena'), where('tel', '==', telDecoded))
+    const unsub = onSnapshot(q, (snap) => {
+      setConsultasLena(
+        snap.docs
+          .map((docSnap) => {
+            const d = docSnap.data()
+            return {
+              id: docSnap.id,
+              zona: String(d.zona ?? 'Sin zona'),
+              cantidadKg: Number(d.cantidadKg ?? 0),
+              estado: String(d.estado ?? 'pendiente'),
+              notas: typeof d.notas === 'string' ? d.notas : undefined,
+            }
+          })
+          .filter((consulta) => consulta.estado !== 'enviado')
+      )
+    })
+    return () => unsub()
+  }, [telDecoded])
+
   async function saveChanges() {
     setSaving(true)
     try {
@@ -107,6 +171,36 @@ export default function ClienteDetailPage() {
       console.error(err)
     } finally {
       setSaving(false)
+    }
+  }
+
+  function openConsultaModal() {
+    setConsultaForm({ cantidadKg: '', zona: cliente?.zona ?? '', notas: '' })
+    setConsultaModal(true)
+  }
+
+  async function saveConsultaLena() {
+    if (!cliente) return
+    const kg = Number(consultaForm.cantidadKg)
+    if (!Number.isFinite(kg) || kg < 1 || kg > 499 || !consultaForm.zona.trim()) return
+    setSavingConsulta(true)
+    try {
+      await addDoc(collection(db, 'consultasLena'), {
+        remoteJid: cliente.remoteJid || `${cliente.tel}@s.whatsapp.net`,
+        tel: cliente.tel,
+        nombre: getDisplayName(cliente),
+        zona: consultaForm.zona.trim(),
+        cantidadKg: Math.round(kg),
+        notas: consultaForm.notas.trim() || null,
+        fechaConsulta: serverTimestamp(),
+        estado: 'pendiente',
+        origen: 'dashboard_cliente_detalle',
+        creadoEn: serverTimestamp(),
+        actualizadoEn: serverTimestamp(),
+      })
+      setConsultaModal(false)
+    } finally {
+      setSavingConsulta(false)
     }
   }
 
@@ -127,6 +221,11 @@ export default function ClienteDetailPage() {
     )
   }
 
+  const nombreVisible = getDisplayName(cliente)
+  const telefonoVisible = getDisplayPhone(cliente)
+  const identidadSecundaria = getIdentitySecondary(cliente)
+  const whatsappHref = telefonoVisible ? `https://wa.me/${telefonoVisible}` : null
+
   return (
     <div className="p-8 max-w-4xl">
       {/* Header */}
@@ -136,7 +235,7 @@ export default function ClienteDetailPage() {
         </button>
         <div className="w-12 h-12 rounded-full bg-brand-100 flex items-center justify-center">
           <span className="text-brand-700 text-lg font-bold">
-            {cliente.nombre?.[0]?.toUpperCase() ?? '?'}
+            {nombreVisible[0]?.toUpperCase() ?? '?'}
           </span>
         </div>
         <div className="flex-1">
@@ -150,12 +249,12 @@ export default function ClienteDetailPage() {
             />
           ) : (
             <h1 className="text-2xl font-bold text-slate-900">
-              {cliente.nombre || 'Sin nombre'}
+              {nombreVisible}
             </h1>
           )}
           <div className="flex items-center gap-3 mt-1">
             <span className="text-slate-500 text-sm flex items-center gap-1">
-              <Phone className="w-3.5 h-3.5" /> {cliente.tel}
+              <Phone className="w-3.5 h-3.5" /> {telefonoVisible || identidadSecundaria}
             </span>
             {cliente.estado && (
               <span className={cn('badge text-xs', ESTADO_COLORS[cliente.estado] ?? 'bg-slate-100 text-slate-600')}>
@@ -171,14 +270,16 @@ export default function ClienteDetailPage() {
           >
             <MessageSquare className="w-4 h-4" /> Ver chat
           </Link>
-          <a
-            href={`https://wa.me/${cliente.tel}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn-secondary flex items-center gap-1.5"
-          >
-            <ExternalLink className="w-4 h-4" /> WhatsApp
-          </a>
+          {whatsappHref && (
+            <a
+              href={whatsappHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-secondary flex items-center gap-1.5"
+            >
+              <ExternalLink className="w-4 h-4" /> WhatsApp
+            </a>
+          )}
           {editing ? (
             <>
               <button onClick={() => setEditing(false)} className="btn-secondary flex items-center gap-1.5">
@@ -416,6 +517,36 @@ export default function ClienteDetailPage() {
         {/* Sidebar */}
         <div className="space-y-4">
           <div className="card p-5">
+            <h3 className="font-semibold text-slate-900 mb-3 text-sm">Identidad WhatsApp</h3>
+            <div className="space-y-3 text-sm">
+              <div>
+                <p className="text-xs text-slate-400">Nombre visible</p>
+                <p className="text-slate-700 font-medium">{nombreVisible}</p>
+              </div>
+              {cliente.pushName && cliente.pushName !== cliente.nombre && (
+                <div>
+                  <p className="text-xs text-slate-400">Nombre WhatsApp / agenda</p>
+                  <p className="text-slate-700">{cliente.pushName}</p>
+                </div>
+              )}
+              <div>
+                <p className="text-xs text-slate-400">Teléfono real</p>
+                <p className="text-slate-700 font-medium">{telefonoVisible || 'Sin teléfono resuelto'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-400">Identificador técnico</p>
+                <p className="text-slate-500 break-all">{identidadSecundaria || '—'}</p>
+              </div>
+              {cliente.whatsappLid && (
+                <div>
+                  <p className="text-xs text-slate-400">WhatsApp LID</p>
+                  <p className="text-slate-500 break-all">{cliente.whatsappLid}</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="card p-5">
             <h3 className="font-semibold text-slate-900 mb-3 text-sm">Actividad</h3>
             <div className="space-y-3">
               {[
@@ -449,6 +580,33 @@ export default function ClienteDetailPage() {
             )}
           </div>
 
+          <div className="card p-5 border-amber-100">
+            <h3 className="font-semibold text-slate-900 mb-3 text-sm flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-600" />
+              Logística leña
+            </h3>
+            {consultasLena.length > 0 ? (
+              <div className="space-y-3">
+                <div className="rounded-lg bg-amber-50 border border-amber-100 p-3 text-sm text-amber-800">
+                  <p className="font-medium">Consulta activa de reparto</p>
+                  <p className="text-xs mt-1">
+                    {consultasLena.reduce((sum, c) => sum + c.cantidadKg, 0)} kg en {consultasLena[0].zona}. Estado: {consultasLena[0].estado.replaceAll('_', ' ')}.
+                  </p>
+                </div>
+                <Link href="/logistica-zonas" className="btn-secondary w-full justify-center flex items-center gap-1.5">
+                  Ver reparto de leña
+                </Link>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-slate-400 text-sm">Sin consulta logística de leña activa.</p>
+                <button onClick={openConsultaModal} className="btn-secondary w-full flex items-center justify-center gap-1.5">
+                  <Plus className="w-4 h-4" /> Registrar para reparto
+                </button>
+              </div>
+            )}
+          </div>
+
           <div className="card p-5">
             <h3 className="font-semibold text-slate-900 mb-3 text-sm">Estado del bot</h3>
             <p className="text-xs text-slate-500 flex items-center gap-2">
@@ -458,6 +616,55 @@ export default function ClienteDetailPage() {
           </div>
         </div>
       </div>
+      {consultaModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg">
+            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+              <h2 className="font-semibold text-slate-900">Registrar consulta leña</h2>
+              <button onClick={() => setConsultaModal(false)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="label">Cantidad kg</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={499}
+                    className="input"
+                    value={consultaForm.cantidadKg}
+                    onChange={(e) => setConsultaForm((f) => ({ ...f, cantidadKg: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="label">Zona</label>
+                  <input
+                    className="input"
+                    value={consultaForm.zona}
+                    onChange={(e) => setConsultaForm((f) => ({ ...f, zona: e.target.value }))}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="label">Notas</label>
+                <textarea
+                  className="input min-h-24"
+                  value={consultaForm.notas}
+                  onChange={(e) => setConsultaForm((f) => ({ ...f, notas: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-4">
+              <button onClick={() => setConsultaModal(false)} className="btn-secondary">Cancelar</button>
+              <button onClick={saveConsultaLena} disabled={savingConsulta} className="btn-primary">
+                {savingConsulta ? 'Guardando...' : 'Guardar consulta'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -2,12 +2,11 @@
 export const dynamic = 'force-dynamic'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { collection, query, orderBy, onSnapshot, doc, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { Truck, Package, MapPin, Clock, CheckCircle2, AlertTriangle, Phone } from 'lucide-react'
-import { format } from 'date-fns'
-import { es } from 'date-fns/locale'
-import { cn, formatRelative } from '@/lib/utils'
+import { cn, formatRelative, getTelFromJid } from '@/lib/utils'
 
 interface PedidoLena {
   id: string
@@ -75,7 +74,11 @@ export default function ColaLenaPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Cola logística de leña</h1>
           <p className="text-slate-500 text-sm mt-0.5">
-            Pedidos agrupados para entrega grupal (≤200kg por pedido)
+            Pedidos de leña confirmados listos para despacho. Para consultas pendientes, usá{' '}
+            <Link href="/logistica-zonas" className="text-brand-600 hover:text-brand-700 font-medium">
+              Zonas & Consultas
+            </Link>
+            .
           </p>
         </div>
       </div>
@@ -179,7 +182,7 @@ export default function ColaLenaPage() {
                         className="text-xs text-brand-600 hover:text-brand-700 flex items-center gap-1"
                       >
                         <Phone className="w-3 h-3" />
-                        {pedido.remoteJid.replace('@s.whatsapp.net', '')}
+                        {getTelFromJid(pedido.remoteJid)}
                       </a>
                     </div>
                   </div>
