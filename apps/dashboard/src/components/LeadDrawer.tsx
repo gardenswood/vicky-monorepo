@@ -118,7 +118,6 @@ const STATUS_CRM_COLORS: Record<string, string> = {
   pendiente_cotizacion: 'bg-blue-50 text-blue-700',
   seguimiento: 'bg-amber-50 text-amber-700',
   concreto: 'bg-green-50 text-green-700',
-  en_obra: 'bg-purple-50 text-purple-700',
   perdido: 'bg-red-50 text-red-700 border-red-200',
   desestimado: 'bg-slate-200 text-slate-700 border-slate-300',
 }
@@ -127,7 +126,6 @@ const STATUS_CRM_LABELS: Record<string, string> = {
   pendiente_cotizacion: '⏱️ Pendiente cotización',
   seguimiento: '👀 Seguimiento',
   concreto: '🎯 Concreto',
-  en_obra: '🚧 En obra',
   perdido: '❌ Perdido',
   desestimado: '👎 Desestimado',
 }
@@ -622,7 +620,6 @@ export function LeadDrawer({ isOpen, onClose, cliente: initialCliente }: LeadDra
                             <option value="pendiente_cotizacion">⏱️ Pendiente cotización</option>
                             <option value="seguimiento">👀 Seguimiento</option>
                             <option value="concreto">🎯 Concreto</option>
-                            <option value="en_obra">🚧 En obra</option>
                             <option value="perdido">❌ Perdido</option>
                             <option value="desestimado">👎 Desestimado</option>
                           </select>
