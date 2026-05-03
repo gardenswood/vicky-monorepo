@@ -79,10 +79,6 @@ seguimiento → seguimiento (reactivar)
   Cuando: responde a seguimiento pero no confirma aún.
   Acción: [SEGUIMIENTO:24-48|motivo actualizado]
 
-concreto → en_obra
-  Cuando: se confirma la seña, pago o inicio de trabajo.
-  Acción: [CALIFICAR:caliente|en_obra|motivo]
-
 cualquier estado → perdido
   Cuando: el cliente dice explícitamente que no, elige otro proveedor, o no responde tras múltiples seguimientos.
   Acción: [PERDIDO:motivo específico]

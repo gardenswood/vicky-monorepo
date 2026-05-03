@@ -166,6 +166,7 @@ async function ejecutarTurnoVickyGeminiCore(deps, params) {
         docIdClienteFirestore,
         bloqueLecturaChatPrevio,
         primerNombreClienteDesdeHistorial,
+        digitosRemitenteChat,
         LIMITE_INDIVIDUAL_KG,
         fs,
     } = deps;
@@ -721,7 +722,7 @@ async function ejecutarTurnoVickyGeminiCore(deps, params) {
             const intereses = interCsv ? normalizarInteresesCrm(interCsv) : [];
             const servicioCrm = inferirServicioDesdeIntereses(intereses);
             if (pot) upd.potencial = pot;
-            if (['pendiente_cotizacion', 'seguimiento', 'concreto', 'en_obra'].includes(st)) upd.statusCrm = st;
+            if (['pendiente_cotizacion', 'seguimiento', 'concreto'].includes(st)) upd.statusCrm = st;
             if (['alta', 'media', 'baja'].includes(urg)) upd.urgencia = urg;
             if (zonaCrm) upd.zona = zonaCrm;
             if (intereses.length) upd.interes = intereses;
@@ -773,7 +774,7 @@ async function ejecutarTurnoVickyGeminiCore(deps, params) {
             const motivoCalif = (partesCalif[2] || '').slice(0, 200);
             const updCalif = {};
             if (potCalif) updCalif.potencial = potCalif;
-            if (['pendiente_cotizacion', 'seguimiento', 'concreto', 'en_obra'].includes(stCalif)) updCalif.statusCrm = stCalif;
+            if (['pendiente_cotizacion', 'seguimiento', 'concreto'].includes(stCalif)) updCalif.statusCrm = stCalif;
             if (Object.keys(updCalif).length) actualizarEstadoCliente(remoteJid, updCalif);
             const clienteCalif = getCliente(remoteJid);
             const telCalif = docIdClienteFirestore(remoteJid, clienteCalif);

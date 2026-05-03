@@ -93,7 +93,12 @@ export default function SeguimientosPage() {
     return () => unsub()
   }, [])
 
-  const ahora = useMemo(() => new Date(), [])
+  const [ahora, setAhora] = useState(() => new Date())
+
+  useEffect(() => {
+    const timer = setInterval(() => setAhora(new Date()), 60000)
+    return () => clearInterval(timer)
+  }, [])
 
   const counts = useMemo(() => {
     let pendientes = 0

@@ -2513,10 +2513,9 @@ async function agregarAColaLena(remoteJid, nombre, direccion, zona, cantidadKg, 
     let dirFinal = direccion || null;
 
     if (!zonaFinal || !nombreFinal) {
-        const telFs = docIdClienteFirestore(remoteJid, getCliente(remoteJid));
-        if (telFs && firestoreModule.isAvailable() && typeof firestoreModule.getClienteDocDataParaAvisoAgenda === 'function') {
+        if (firestoreModule.isAvailable() && typeof firestoreModule.getClienteDocDataParaAvisoAgenda === 'function') {
             try {
-                const crmDoc = await firestoreModule.getClienteDocDataParaAvisoAgenda(telFs);
+                const crmDoc = await firestoreModule.getClienteDocDataParaAvisoAgenda(remoteJid);
                 if (crmDoc) {
                     if (!zonaFinal) zonaFinal = crmDoc.zona || null;
                     if (!nombreFinal) nombreFinal = crmDoc.nombre || crmDoc.pushName || null;
@@ -5661,12 +5660,10 @@ async function ejecutarCronProgramados() {
             const jid = p.jid;
             const texto = p.texto || 'Hola! Te escribo como habíamos acordado 😊 — Vicky';
             const esSeguimiento = p.origen === 'gemini_seguimiento' || p.motivoSeguimiento;
-            if (esSeguimiento) {
-                const st = firestoreModule.getChatSilenceState
-                    ? await firestoreModule.getChatSilenceState(jid).catch(() => null)
-                    : null;
+            if (firestoreModule.getChatSilenceState) {
+                const st = await firestoreModule.getChatSilenceState(jid).catch(() => null);
                 if (st?.shouldSilence) {
-                    console.log(`🔇 Seguimiento omitido (silencio activo): ${jid}`);
+                    console.log(`🔇 Programado omitido (silencio activo): ${jid}`);
                     await firestoreModule.marcarProgramadoEstado(p.id, 'omitido_silencio');
                     continue;
                 }

@@ -223,13 +223,19 @@ export default function ClientesPage() {
     return map
   }, [consultasLena])
 
+  const [tick, setTick] = useState(0)
+  useEffect(() => {
+    const timer = setInterval(() => setTick((t) => t + 1), 60000)
+    return () => clearInterval(timer)
+  }, [])
+
   const todayStart = useMemo(() => {
     const d = new Date(); d.setHours(0, 0, 0, 0); return d
-  }, [])
+  }, [tick])
 
   const todayEnd = useMemo(() => {
     const d = new Date(); d.setHours(23, 59, 59, 999); return d
-  }, [])
+  }, [tick])
 
   const counts = useMemo(() => ({
     nuevos: clientes.filter((c) => !c.estado || c.estado === 'capturados').length,

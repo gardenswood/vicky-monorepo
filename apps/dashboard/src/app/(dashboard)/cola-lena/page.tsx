@@ -172,7 +172,7 @@ export default function ColaLenaPage() {
         ) : (
           <div className="divide-y divide-slate-100">
             {pedidos.map((pedido) => {
-              const cfg = ESTADO_CONFIG[pedido.estado]
+              const cfg = ESTADO_CONFIG[pedido.estado] || { label: pedido.estado, color: 'bg-slate-100 text-slate-600', icon: <Package className="w-3.5 h-3.5" /> }
               return (
                 <div key={pedido.id} className={cn(
                   'flex items-center gap-4 px-5 py-4 hover:bg-slate-50 transition-colors',

@@ -151,6 +151,18 @@ export function LeadDrawer({ isOpen, onClose, cliente: initialCliente }: LeadDra
   const telDecoded = initialCliente?.tel
 
   useEffect(() => {
+    if (!isOpen) {
+      setConsultaModal(false)
+      setSeguimientoModal(false)
+      setMotivoPerdidaModal(null)
+      setShowChatModal(false)
+      setEditing(false)
+      setMotivoPerdida('')
+      setSeguimientoForm({ fecha: '', hora: '14:00', texto: '' })
+    }
+  }, [isOpen])
+
+  useEffect(() => {
     if (!telDecoded || !isOpen) return
 
     setLoading(true)
@@ -759,7 +771,7 @@ export function LeadDrawer({ isOpen, onClose, cliente: initialCliente }: LeadDra
                                     {a.datos.potencial}
                                   </span>
                                 )}
-                                {a.datos.statusCrm && (
+                                {a.datos.statusCrm && typeof a.datos.statusCrm === 'string' && (
                                   <span className="badge text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">
                                     {a.datos.statusCrm.replaceAll('_', ' ')}
                                   </span>
