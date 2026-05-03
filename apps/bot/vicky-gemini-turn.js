@@ -618,17 +618,77 @@ async function ejecutarTurnoVickyGeminiCore(deps, params) {
             const zonaCliente = histCliente?.zona || null;
             const dirFinal = direccionLena || histCliente?.direccion || 'Sin dirección';
 
+            const interesActual = Array.isArray(histCliente?.interes) ? histCliente.interes : [];
+            if (!interesActual.includes('lena')) {
+                actualizarEstadoCliente(remoteJid, { interes: [...interesActual, 'lena'], servicioPendiente: 'lena' });
+            } else if (!histCliente?.servicioPendiente) {
+                actualizarEstadoCliente(remoteJid, { servicioPendiente: 'lena' });
+            }
+
             if (cantidadKg > 0 && cantidadKg <= LIMITE_INDIVIDUAL_KG) {
                 if (direccionLena) actualizarEstadoCliente(remoteJid, { direccion: direccionLena });
                 await agregarAColaLena(remoteJid, nombreCliente, dirFinal, zonaCliente, cantidadKg, tipoLena);
                 const telFs = docIdClienteFirestore(remoteJid, getCliente(remoteJid));
                 if (telFs && firestoreModule.syncCliente) {
-                    const fsPatch = { direccion: dirFinal };
+                    const fsPatch = { direccion: dirFinal, servicioPendiente: 'lena' };
                     if (tipoLena) fsPatch.tipoLenaPreferido = tipoLena;
                     firestoreModule.syncCliente(telFs, fsPatch).catch(() => {});
                 }
+                if (telFs && typeof firestoreModule.addAccionCrm === 'function') {
+                    firestoreModule.addAccionCrm({
+                        tel: telFs,
+                        tipo: 'pedido_lena_cola',
+                        datos: { kg: cantidadKg, zona: zonaCliente, direccion: dirFinal, tipo: tipoLena },
+                        origen: 'vicky_auto',
+                    }).catch(() => {});
+                }
             } else if (cantidadKg > LIMITE_INDIVIDUAL_KG) {
-                console.log(`🚚 Pedido de ${cantidadKg}kg → entrega individual, no va a cola`);
+                actualizarEstadoCliente(remoteJid, {
+                    potencial: 'caliente',
+                    statusCrm: 'concreto',
+                    urgencia: 'alta',
+                });
+                if (direccionLena) actualizarEstadoCliente(remoteJid, { direccion: direccionLena });
+
+                const telFsInd = docIdClienteFirestore(remoteJid, getCliente(remoteJid));
+                if (telFsInd && firestoreModule.isAvailable()) {
+                    const cliInd = getCliente(remoteJid);
+                    const telContacto = telefonoLineaParaFirestore(remoteJid, cliInd);
+                    const tituloEnt = `Leña ${cantidadKg}kg${tipoLena ? ` (${tipoLena})` : ''} — ${nombreCliente || 'Cliente'}`;
+                    const hoy = new Date();
+                    const fechaDia = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
+
+                    if (typeof firestoreModule.addEntregaAgenda === 'function') {
+                        firestoreModule.addEntregaAgenda({
+                            jid: remoteJid,
+                            fechaDia,
+                            horaTexto: null,
+                            titulo: tituloEnt,
+                            notas: `Pedido individual ${cantidadKg}kg. Zona: ${zonaCliente || 'sin zona'}. Dir: ${dirFinal}`,
+                            kg: cantidadKg,
+                            origen: 'gemini_pedido_lena_individual',
+                            telefonoContacto: telContacto,
+                            direccion: dirFinal,
+                            producto: `lena${tipoLena ? ` ${tipoLena}` : ''}`,
+                        }).catch(() => {});
+                    }
+                    if (typeof firestoreModule.addAccionCrm === 'function') {
+                        firestoreModule.addAccionCrm({
+                            tel: telFsInd,
+                            tipo: 'pedido_lena_individual',
+                            datos: { kg: cantidadKg, zona: zonaCliente, direccion: dirFinal, tipo: tipoLena },
+                            origen: 'vicky_auto',
+                        }).catch(() => {});
+                    }
+                    firestoreModule.syncCliente(telFsInd, {
+                        potencial: 'caliente',
+                        statusCrm: 'concreto',
+                        urgencia: 'alta',
+                        servicioPendiente: 'lena',
+                        direccion: dirFinal,
+                    }).catch(() => {});
+                }
+                console.log(`🚚 Pedido individual ${cantidadKg}kg → agenda + CRM concreto (${remoteJid})`);
             }
         } else if (pedidoLenaMatch && esIg) {
             respuesta = respuesta.replace(/\[PEDIDO_LENA:[^\]]+\]/gi, '').trim();

@@ -350,6 +350,20 @@ export function LeadDrawer({ isOpen, onClose, cliente: initialCliente }: LeadDra
         creadoEn: serverTimestamp(),
         actualizadoEn: serverTimestamp(),
       })
+      const currentInteres = Array.isArray(cliente.interes) ? cliente.interes : []
+      const updatedInteres = currentInteres.includes('lena') ? currentInteres : [...currentInteres, 'lena']
+      await updateDoc(doc(db, 'clientes', telDecoded), {
+        statusCrm: cliente.statusCrm === 'concreto' ? 'concreto' : 'seguimiento',
+        interes: updatedInteres,
+        servicioPendiente: cliente.servicioPendiente || 'lena',
+        ultimaActualizacion: serverTimestamp(),
+      })
+      await addDoc(collection(db, 'clientes', telDecoded, 'acciones_crm'), {
+        tipo: 'consulta_lena_registrada',
+        datos: { kg: Math.round(kg), zona: consultaForm.zona.trim() },
+        origen: 'dashboard',
+        creadoEn: serverTimestamp(),
+      })
       setConsultaModal(false)
     } finally {
       setSavingConsulta(false)

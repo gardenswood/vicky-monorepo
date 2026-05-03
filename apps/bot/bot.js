@@ -2506,15 +2506,38 @@ async function optimizarRutaEntregasColaLeña(pedidos, meta) {
 }
 
 async function agregarAColaLena(remoteJid, nombre, direccion, zona, cantidadKg, tipoLena = null) {
-    // Evitar duplicados del mismo cliente
     const tel = getTel(remoteJid);
+
+    let zonaFinal = zona || null;
+    let nombreFinal = nombre || null;
+    let dirFinal = direccion || null;
+
+    if (!zonaFinal || !nombreFinal) {
+        const telFs = docIdClienteFirestore(remoteJid, getCliente(remoteJid));
+        if (telFs && firestoreModule.isAvailable() && typeof firestoreModule.getClienteDocDataParaAvisoAgenda === 'function') {
+            try {
+                const crmDoc = await firestoreModule.getClienteDocDataParaAvisoAgenda(telFs);
+                if (crmDoc) {
+                    if (!zonaFinal) zonaFinal = crmDoc.zona || null;
+                    if (!nombreFinal) nombreFinal = crmDoc.nombre || crmDoc.pushName || null;
+                    if (!dirFinal || dirFinal === 'Sin dirección') dirFinal = crmDoc.direccion || dirFinal;
+                }
+            } catch (_) { /* fallback silencioso */ }
+        }
+    }
+    if (!zonaFinal && dirFinal && dirFinal !== 'Sin dirección') {
+        zonaFinal = dirFinal;
+    }
+    if (!zonaFinal) {
+        console.warn(`⚠️ Cola leña: pedido ${tel} sin zona ni dirección — el cluster por zona no lo agrupará`);
+    }
+
     const existente = colaLena.findIndex(p => getTel(p.remoteJid) === tel && p.estado === 'en_cola');
     if (existente >= 0) {
-        // Actualizar pedido existente (no pisar kg > 0 con 0: alta solo-tel / CRM)
         if (Number(cantidadKg) > 0) colaLena[existente].cantidadKg = cantidadKg;
-        colaLena[existente].direccion = direccion || colaLena[existente].direccion;
-        colaLena[existente].zona = zona || colaLena[existente].zona;
-        colaLena[existente].nombre = nombre || colaLena[existente].nombre;
+        colaLena[existente].direccion = dirFinal || colaLena[existente].direccion;
+        colaLena[existente].zona = zonaFinal || colaLena[existente].zona;
+        colaLena[existente].nombre = nombreFinal || colaLena[existente].nombre;
         if (tipoLena) colaLena[existente].tipoLena = tipoLena;
         delete colaLena[existente].ordenRuta;
         delete colaLena[existente].rutaGrupoId;
@@ -2523,15 +2546,15 @@ async function agregarAColaLena(remoteJid, nombre, direccion, zona, cantidadKg, 
     } else {
         colaLena.push({
             remoteJid,
-            nombre: nombre || null,
-            direccion: direccion || 'Sin dirección',
-            zona: zona || null,
+            nombre: nombreFinal || null,
+            direccion: dirFinal || 'Sin dirección',
+            zona: zonaFinal || null,
             cantidadKg,
             tipoLena: tipoLena || null,
             fechaPedido: new Date().toISOString(),
             estado: 'en_cola'
         });
-        console.log(`➕ Pedido agregado a cola leña: ${tel} — ${cantidadKg > 0 ? `${cantidadKg}kg` : 'kg pendiente'}`);
+        console.log(`➕ Pedido agregado a cola leña: ${tel} — ${cantidadKg > 0 ? `${cantidadKg}kg` : 'kg pendiente'}${zonaFinal ? ` (${zonaFinal})` : ' [SIN ZONA]'}`);
     }
     await saveColaLenaGCS();
 

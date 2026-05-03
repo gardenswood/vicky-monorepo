@@ -111,6 +111,29 @@ export default function ColaLenaPage() {
         )}
       </div>
 
+      {/* Advertencias de datos incompletos */}
+      {(() => {
+        const sinZona = enCola.filter((p) => !p.zona).length
+        const sinKg = enCola.filter((p) => p.cantidadKg === 0).length
+        if (sinZona === 0 && sinKg === 0) return null
+        return (
+          <div className="card p-4 mb-5 border-amber-200 bg-amber-50/50 flex flex-wrap gap-4">
+            {sinZona > 0 && (
+              <div className="flex items-center gap-2 text-sm text-red-700">
+                <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+                <span><strong>{sinZona} pedido{sinZona > 1 ? 's' : ''}</strong> sin zona — no se agruparán por corredor</span>
+              </div>
+            )}
+            {sinKg > 0 && (
+              <div className="flex items-center gap-2 text-sm text-yellow-700">
+                <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+                <span><strong>{sinKg} pedido{sinKg > 1 ? 's' : ''}</strong> con 0 kg — no suman al umbral de camión</span>
+              </div>
+            )}
+          </div>
+        )
+      })()}
+
       {/* Estado tabs */}
       <div className="grid grid-cols-3 gap-3 mb-5">
         {Object.entries(ESTADO_CONFIG).map(([key, cfg]) => {
@@ -151,7 +174,11 @@ export default function ColaLenaPage() {
             {pedidos.map((pedido) => {
               const cfg = ESTADO_CONFIG[pedido.estado]
               return (
-                <div key={pedido.id} className="flex items-center gap-4 px-5 py-4 hover:bg-slate-50 transition-colors">
+                <div key={pedido.id} className={cn(
+                  'flex items-center gap-4 px-5 py-4 hover:bg-slate-50 transition-colors',
+                  (!pedido.zona && pedido.estado === 'en_cola') && 'bg-red-50/40',
+                  (pedido.cantidadKg === 0 && pedido.estado === 'en_cola') && 'bg-yellow-50/40',
+                )}>
                   <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
                     <Truck className="w-5 h-5 text-amber-600" />
                   </div>
@@ -161,13 +188,23 @@ export default function ColaLenaPage() {
                       <span className={cn('badge text-xs flex items-center gap-1', cfg.color)}>
                         {cfg.icon} {cfg.label}
                       </span>
+                      {!pedido.zona && pedido.estado === 'en_cola' && (
+                        <span className="badge text-[10px] bg-red-100 text-red-700 flex items-center gap-0.5 px-1.5 py-0.5">
+                          <AlertTriangle className="w-3 h-3" /> Sin zona
+                        </span>
+                      )}
+                      {pedido.cantidadKg === 0 && pedido.estado === 'en_cola' && (
+                        <span className="badge text-[10px] bg-yellow-100 text-yellow-700 flex items-center gap-0.5 px-1.5 py-0.5">
+                          <AlertTriangle className="w-3 h-3" /> 0 kg
+                        </span>
+                      )}
                     </div>
                     <div className="flex items-center gap-3 text-xs text-slate-500">
                       <span className="flex items-center gap-1">
                         <Package className="w-3 h-3" /> {pedido.cantidadKg} kg
                       </span>
                       <span className="flex items-center gap-1">
-                        <MapPin className="w-3 h-3" /> {pedido.direccion}
+                        <MapPin className="w-3 h-3" /> {pedido.direccion || 'Sin dirección'}
                       </span>
                       {pedido.zona && <span>{pedido.zona}</span>}
                       {pedido.fechaPedido && (
