@@ -443,15 +443,108 @@ export default function ClientesPage() {
         </div>
       </div>
 
-      {/* Kanban Board */}
-      <div className="flex-1 overflow-x-auto overflow-y-hidden p-6">
+      {/* Vista: Lista filtrada o Kanban */}
+      <div className="flex-1 overflow-auto p-6">
         {loading ? (
           <div className="flex gap-5 h-full">
             {[1, 2, 3, 4].map((i) => (
               <div key={i} className="w-80 flex-shrink-0 bg-slate-100/50 rounded-xl border border-slate-200/60 p-4 h-full animate-pulse" />
             ))}
           </div>
+        ) : activeStatFilter ? (
+          /* Vista de lista cuando hay filtro activo */
+          <div className="max-w-4xl mx-auto space-y-2">
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-sm text-slate-500 font-medium">
+                {filtered.length} contacto{filtered.length !== 1 ? 's' : ''} — filtro: <span className="font-bold text-slate-700">{STATS.find((s) => s.key === activeStatFilter)?.label}</span>
+              </p>
+            </div>
+            {filtered.length === 0 ? (
+              <div className="card p-12 text-center">
+                <Users className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+                <p className="text-slate-500">No hay contactos en esta categoría.</p>
+              </div>
+            ) : (
+              filtered.map((lead) => {
+                const telefonoVisible = getDisplayPhone(lead)
+                const nombreVisible = getDisplayName(lead)
+                const consultasCliente = consultasByTel.get(lead.tel) ?? (telefonoVisible ? consultasByTel.get(telefonoVisible) : undefined) ?? []
+                const vencido = lead.proximoContactoAt && lead.proximoContactoAt < todayStart
+                const seguimientoHoyLead = lead.proximoContactoAt && lead.proximoContactoAt >= todayStart && lead.proximoContactoAt <= todayEnd
+
+                return (
+                  <div
+                    key={lead.tel}
+                    onClick={() => openLeadDetails(lead)}
+                    className={cn(
+                      'card p-4 flex items-center gap-4 cursor-pointer hover:shadow-md hover:border-brand-300 transition-all',
+                      potencialBg(lead.potencial),
+                    )}
+                  >
+                    <div className={cn(
+                      'w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0',
+                      normalizePotencial(lead.potencial) === 'caliente' ? 'bg-orange-200' :
+                      normalizePotencial(lead.potencial) === 'tibio' ? 'bg-yellow-200' :
+                      normalizePotencial(lead.potencial) === 'frio' ? 'bg-sky-200' : 'bg-slate-200'
+                    )}>
+                      <span className="text-slate-700 text-xs font-bold">{getInitials(nombreVisible)}</span>
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="text-sm font-semibold text-slate-900">{nombreVisible}</h4>
+                        <span className="text-xs text-slate-400 flex items-center gap-1">
+                          <Phone className="w-3 h-3" />
+                          {telefonoVisible || getIdentitySecondary(lead)}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                        {lead.estado && (
+                          <span className={cn('text-[10px] font-medium px-1.5 py-0.5 rounded', ESTADO_COLORS[lead.estado] ?? 'bg-slate-100 text-slate-600')}>
+                            {ESTADO_LABELS[lead.estado] ?? lead.estado}
+                          </span>
+                        )}
+                        {lead.statusCrm && (
+                          <span className={cn('text-[10px] font-medium px-1.5 py-0.5 rounded', STATUS_CRM_COLORS[lead.statusCrm] ?? 'bg-slate-100 text-slate-600')}>
+                            {crmLabel(lead.statusCrm)}
+                          </span>
+                        )}
+                        {lead.potencial && (
+                          <span className={cn('text-[10px] font-medium px-1.5 py-0.5 rounded', potencialClass(lead.potencial))}>
+                            {lead.potencial}
+                          </span>
+                        )}
+                        {vencido && <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-red-100 text-red-700">Vencido</span>}
+                        {seguimientoHoyLead && (
+                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 flex items-center gap-0.5">
+                            <CalendarClock className="w-3 h-3" /> Hoy
+                          </span>
+                        )}
+                        {consultasCliente.length > 0 && (
+                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 flex items-center gap-0.5">
+                            <AlertTriangle className="w-3 h-3" /> Leña
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col items-end gap-1 flex-shrink-0 text-right">
+                      {lead.zona && (
+                        <span className="text-[10px] text-slate-500 flex items-center gap-1">
+                          <MapPin className="w-3 h-3" /> {lead.zona}
+                        </span>
+                      )}
+                      <span className="text-[10px] text-slate-400 flex items-center gap-1">
+                        <Clock className="w-3 h-3" /> {formatRelative(lead.fechaUltimoContacto)}
+                      </span>
+                    </div>
+                  </div>
+                )
+              })
+            )}
+          </div>
         ) : (
+          /* Kanban cuando no hay filtro */
           <DragDropContext onDragEnd={handleDragEnd}>
             <div className="flex gap-5 h-full pb-4">
               {COLUMNS.map((colId) => {
