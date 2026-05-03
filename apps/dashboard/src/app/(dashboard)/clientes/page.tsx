@@ -16,6 +16,7 @@ import {
   MessageSquare,
   Maximize2,
   AlertTriangle,
+  CalendarClock,
 } from 'lucide-react'
 import {
   formatRelative,
@@ -242,7 +243,14 @@ export default function ClientesPage() {
     return d
   }, [])
 
+  const todayEnd = useMemo(() => {
+    const d = new Date()
+    d.setHours(23, 59, 59, 999)
+    return d
+  }, [])
+
   const seguimientosVencidos = clientes.filter((c) => c.proximoContactoAt && c.proximoContactoAt < todayStart).length
+  const seguimientosHoy = clientes.filter((c) => c.proximoContactoAt && c.proximoContactoAt >= todayStart && c.proximoContactoAt <= todayEnd).length
   const clientesConConsultaLena = new Set(consultasLena.map((c) => c.tel)).size
 
   useEffect(() => {
@@ -366,7 +374,7 @@ export default function ClientesPage() {
         </div>
 
         {/* Stats bar */}
-        <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-7 gap-3 mb-5">
+        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3 mb-5">
           {[
             { label: 'Nuevos', count: clientes.filter((c) => !c.estado || c.estado === 'capturados').length, color: 'bg-slate-100 text-slate-600' },
             { label: 'Clasificando', count: clientes.filter((c) => c.estado === 'clasificando').length, color: 'bg-fuchsia-100 text-fuchsia-700' },
@@ -374,6 +382,7 @@ export default function ClientesPage() {
             { label: 'Seguimiento', count: clientes.filter((c) => c.statusCrm === 'seguimiento').length, color: 'bg-amber-100 text-amber-700' },
             { label: 'Concretos', count: clientes.filter((c) => c.statusCrm === 'concreto').length, color: 'bg-green-100 text-green-700' },
             { label: 'En obra', count: clientes.filter((c) => c.statusCrm === 'en_obra').length, color: 'bg-purple-100 text-purple-700' },
+            { label: 'Hoy', count: seguimientosHoy, color: 'bg-indigo-100 text-indigo-700' },
             { label: 'Vencidos', count: seguimientosVencidos, color: 'bg-red-100 text-red-700' },
           ].map((s) => (
             <div key={s.label} className="card p-4 flex items-center gap-3">
@@ -502,6 +511,7 @@ export default function ClientesPage() {
                             const telefonoVisible = getDisplayPhone(lead)
                             const consultasCliente = consultasByTel.get(lead.tel) ?? (telefonoVisible ? consultasByTel.get(telefonoVisible) : undefined) ?? []
                             const vencido = lead.proximoContactoAt && lead.proximoContactoAt < todayStart
+                            const seguimientoHoyLead = lead.proximoContactoAt && lead.proximoContactoAt >= todayStart && lead.proximoContactoAt <= todayEnd
                             const nombreVisible = getDisplayName(lead)
 
                             return (
@@ -547,6 +557,11 @@ export default function ClientesPage() {
                                       )}
                                       {vencido && (
                                         <span className="badge text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700">Vencido</span>
+                                      )}
+                                      {seguimientoHoyLead && (
+                                        <span className="badge text-[10px] px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 flex items-center gap-1">
+                                          <CalendarClock className="w-3 h-3" /> Hoy
+                                        </span>
                                       )}
                                       {consultasCliente.length > 0 && (
                                         <span className="badge text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 flex items-center gap-1">

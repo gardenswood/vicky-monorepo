@@ -15,6 +15,13 @@
       "archivo": "funciones-dashboard.md",
       "activo": true,
       "orden": 20
+    },
+    {
+      "id": "crm-calificacion",
+      "nombre": "CRM_CALIFICACION",
+      "archivo": "crm-calificacion.md",
+      "activo": true,
+      "orden": 15
     }
   ]
 }

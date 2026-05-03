@@ -670,6 +670,86 @@ async function ejecutarTurnoVickyGeminiCore(deps, params) {
             respuesta = respuesta.replace(/\[CRM:[^\]]+\]/gi, '').trim();
         }
 
+        const seguimientoMatch = respuesta.match(/\[SEGUIMIENTO:([^\]]+)\]/i);
+        if (seguimientoMatch && firestoreModule.isAvailable()) {
+            const partesSeg = seguimientoMatch[1].split('|').map((x) => x.trim());
+            const horasSeg = parseInt(partesSeg[0], 10);
+            const motivoSeg = (partesSeg[1] || '').slice(0, 200);
+            if (Number.isFinite(horasSeg) && horasSeg > 0 && motivoSeg) {
+                const runMsSeg = Date.now() + horasSeg * 3600000;
+                const clienteSeg = getCliente(remoteJid);
+                const nombreSeg = clienteSeg?.nombre || '';
+                await firestoreModule.addMensajeProgramado({
+                    jid: remoteJid,
+                    texto: motivoSeg,
+                    runAtMs: runMsSeg,
+                    origen: 'gemini_seguimiento',
+                    motivoSeguimiento: motivoSeg,
+                    nombreCliente: nombreSeg,
+                });
+                actualizarEstadoCliente(remoteJid, {
+                    statusCrm: 'seguimiento',
+                    proximoContactoAt: new Date(runMsSeg),
+                });
+                const telSeg = docIdClienteFirestore(remoteJid, clienteSeg);
+                if (telSeg && typeof firestoreModule.addAccionCrm === 'function') {
+                    firestoreModule.addAccionCrm({
+                        tel: telSeg,
+                        tipo: 'seguimiento_agendado',
+                        datos: { horas: horasSeg, motivo: motivoSeg, runAt: new Date(runMsSeg).toISOString() },
+                        origen: 'vicky_auto',
+                    }).catch(() => {});
+                }
+                console.log(`📅 Seguimiento agendado ${remoteJid} en ${horasSeg}h: ${motivoSeg}`);
+            }
+            respuesta = respuesta.replace(/\[SEGUIMIENTO:[^\]]+\]/gi, '').trim();
+        }
+
+        const calificarMatch = respuesta.match(/\[CALIFICAR:([^\]]+)\]/i);
+        if (calificarMatch) {
+            const partesCalif = calificarMatch[1].split('|').map((x) => x.trim());
+            const potCalif = normalizarPotencialCrm(partesCalif[0]);
+            const stCalif = (partesCalif[1] || '').toLowerCase();
+            const motivoCalif = (partesCalif[2] || '').slice(0, 200);
+            const updCalif = {};
+            if (potCalif) updCalif.potencial = potCalif;
+            if (['pendiente_cotizacion', 'seguimiento', 'concreto', 'en_obra'].includes(stCalif)) updCalif.statusCrm = stCalif;
+            if (Object.keys(updCalif).length) actualizarEstadoCliente(remoteJid, updCalif);
+            const clienteCalif = getCliente(remoteJid);
+            const telCalif = docIdClienteFirestore(remoteJid, clienteCalif);
+            if (telCalif && typeof firestoreModule.addAccionCrm === 'function') {
+                firestoreModule.addAccionCrm({
+                    tel: telCalif,
+                    tipo: 'calificacion',
+                    datos: { potencial: potCalif || null, statusCrm: stCalif || null, motivo: motivoCalif },
+                    origen: 'vicky_auto',
+                }).catch(() => {});
+            }
+            console.log(`🏷️ Calificación ${remoteJid}: ${potCalif || '-'}/${stCalif || '-'} — ${motivoCalif}`);
+            respuesta = respuesta.replace(/\[CALIFICAR:[^\]]+\]/gi, '').trim();
+        }
+
+        const perdidoMatch = respuesta.match(/\[PERDIDO:([^\]]+)\]/i);
+        if (perdidoMatch) {
+            const motivoPerdido = (perdidoMatch[1] || '').trim().slice(0, 300);
+            actualizarEstadoCliente(remoteJid, {
+                statusCrm: 'perdido',
+                potencial: 'frio',
+            });
+            const clientePerd = getCliente(remoteJid);
+            const telPerd = docIdClienteFirestore(remoteJid, clientePerd);
+            if (telPerd && typeof firestoreModule.addAccionCrm === 'function') {
+                firestoreModule.addAccionCrm({
+                    tel: telPerd,
+                    tipo: 'perdido',
+                    datos: { motivo: motivoPerdido },
+                    origen: 'vicky_auto',
+                }).catch(() => {});
+            }
+            console.log(`💀 Lead perdido ${remoteJid}: ${motivoPerdido}`);
+            respuesta = respuesta.replace(/\[PERDIDO:[^\]]+\]/gi, '').trim();
+        }
+
         const ventaMatch = respuesta.match(/\[NOTIFICAR_VENTA:([^\]]+)\]/i);
         let notificarVentaResumen = null;
         if (ventaMatch) {

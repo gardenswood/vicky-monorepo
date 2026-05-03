@@ -2119,20 +2119,44 @@ function coincideServicioBroadcast(servicioPendiente, tokenNorm) {
     return false;
 }
 
+// ── Acciones CRM (historial auditable) ───────────────────────────────
+async function addAccionCrm({ tel, tipo, datos, origen }) {
+    if (!firestoreDb || !tel || !tipo) return null;
+    try {
+        const admin = require('firebase-admin');
+        const FieldValue = admin.firestore.FieldValue;
+        const ref = await firestoreDb
+            .collection('clientes').doc(tel)
+            .collection('acciones_crm').add({
+                tipo,
+                datos: datos || {},
+                origen: origen || 'bot',
+                creadoEn: FieldValue.serverTimestamp(),
+            });
+        return ref.id;
+    } catch (e) {
+        console.warn('⚠️ addAccionCrm:', e.message);
+        return null;
+    }
+}
+
 // ── Mensajes programados (seguimiento) ───────────────────────────────
-async function addMensajeProgramado({ jid, texto, runAtMs, origen }) {
+async function addMensajeProgramado({ jid, texto, runAtMs, origen, motivoSeguimiento, nombreCliente }) {
     if (!firestoreDb || !jid || !texto) return null;
     try {
         const admin = require('firebase-admin');
         const FieldValue = admin.firestore.FieldValue;
-        const ref = await firestoreDb.collection('mensajes_programados').add({
+        const doc = {
             jid,
             texto: String(texto).slice(0, 2000),
             runAt: admin.firestore.Timestamp.fromMillis(Number(runAtMs)),
             estado: 'pendiente',
             origen: origen || 'bot',
             creadoEn: FieldValue.serverTimestamp(),
-        });
+        };
+        if (motivoSeguimiento) doc.motivoSeguimiento = String(motivoSeguimiento).slice(0, 200);
+        if (nombreCliente) doc.nombreCliente = String(nombreCliente).slice(0, 100);
+        const ref = await firestoreDb.collection('mensajes_programados').add(doc);
         return ref.id;
     } catch (e) {
         console.warn('⚠️ addMensajeProgramado:', e.message);
@@ -2872,6 +2896,7 @@ module.exports = {
     getRutaLogistica,
     listClientesParaCampanaGeo,
     listClientesParaBroadcast,
+    addAccionCrm,
     addMensajeProgramado,
     obtenerProgramadosPendientesHasta,
     marcarProgramadoEstado,

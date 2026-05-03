@@ -20,7 +20,10 @@ import {
   MapPin,
   Calendar,
   Megaphone,
+  CalendarClock,
 } from 'lucide-react'
+import { collection, query, where, onSnapshot } from 'firebase/firestore'
+import { db } from '@/lib/firebase'
 
 const navItems = [
   {
@@ -42,6 +45,11 @@ const navItems = [
     label: 'CRM Ventas',
     href: '/clientes',
     icon: Users,
+  },
+  {
+    label: 'Seguimientos',
+    href: '/seguimientos',
+    icon: CalendarClock,
   },
   {
     label: 'Leña & Logística',
@@ -80,12 +88,30 @@ export default function Sidebar({ onNavigate, className }: SidebarProps) {
   const router = useRouter()
   const [userEmail, setUserEmail] = useState<string>('')
   const [userRole, setUserRole] = useState<string>('')
+  const [seguimientosPendientes, setSeguimientosPendientes] = useState(0)
 
   useEffect(() => {
     fetch('/api/auth/verify').then(r => r.json()).then(data => {
       if (data.email) setUserEmail(data.email)
       if (data.role) setUserRole(data.role)
     }).catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    const q = query(
+      collection(db, 'mensajes_programados'),
+      where('estado', '==', 'pendiente')
+    )
+    const unsub = onSnapshot(q, (snap) => {
+      const ahora = new Date()
+      let count = 0
+      snap.docs.forEach((d) => {
+        const runAt = d.data().runAt?.toDate?.()
+        if (runAt && runAt <= ahora) count++
+      })
+      setSeguimientosPendientes(count)
+    })
+    return () => unsub()
   }, [])
 
   async function handleLogout() {
@@ -154,6 +180,7 @@ export default function Sidebar({ onNavigate, className }: SidebarProps) {
           }
 
           const active = item.href === '/' ? pathname === '/' : pathname === item.href || pathname.startsWith(item.href!)
+          const badgeCount = item.href === '/seguimientos' ? seguimientosPendientes : 0
           return (
             <Link
               key={item.href}
@@ -168,7 +195,12 @@ export default function Sidebar({ onNavigate, className }: SidebarProps) {
             >
               <item.icon className="w-4 h-4 flex-shrink-0" />
               <span>{item.label}</span>
-              {active && <ChevronRight className="w-3 h-3 ml-auto opacity-60" />}
+              {badgeCount > 0 && (
+                <span className="ml-auto bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
+                  {badgeCount}
+                </span>
+              )}
+              {active && !badgeCount && <ChevronRight className="w-3 h-3 ml-auto opacity-60" />}
             </Link>
           )
         })}

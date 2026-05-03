@@ -10,7 +10,10 @@ import {
   query,
   updateDoc,
   where,
+  orderBy,
+  limit,
   serverTimestamp,
+  Timestamp,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import {
@@ -28,6 +31,9 @@ import {
   AlertTriangle,
   ThumbsDown,
   XCircle,
+  CalendarClock,
+  History,
+  Send,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -75,6 +81,14 @@ interface ConsultaLenaActiva {
   cantidadKg: number
   estado: string
   notas?: string
+}
+
+interface AccionCrm {
+  id: string
+  tipo: string
+  datos: Record<string, string | null>
+  origen: string
+  creadoEn?: Date
 }
 
 function optionalDate(value: unknown): Date | undefined {
@@ -129,6 +143,12 @@ export function LeadDrawer({ isOpen, onClose, cliente: initialCliente }: LeadDra
   const [showChatModal, setShowChatModal] = useState(false)
   const [consultaForm, setConsultaForm] = useState({ cantidadKg: '', zona: '', notas: '' })
   const [savingConsulta, setSavingConsulta] = useState(false)
+  const [accionesCrm, setAccionesCrm] = useState<AccionCrm[]>([])
+  const [seguimientoModal, setSeguimientoModal] = useState(false)
+  const [seguimientoForm, setSeguimientoForm] = useState({ fecha: '', hora: '14:00', texto: '' })
+  const [savingSeguimiento, setSavingSeguimiento] = useState(false)
+  const [motivoPerdidaModal, setMotivoPerdidaModal] = useState<'perdido' | 'desestimado' | null>(null)
+  const [motivoPerdida, setMotivoPerdida] = useState('')
 
   const telDecoded = initialCliente?.tel
 
@@ -209,6 +229,32 @@ export function LeadDrawer({ isOpen, onClose, cliente: initialCliente }: LeadDra
     return () => unsub()
   }, [telDecoded, isOpen])
 
+  useEffect(() => {
+    if (!telDecoded || !isOpen) return
+    const q = query(
+      collection(db, 'clientes', telDecoded, 'acciones_crm'),
+      orderBy('creadoEn', 'desc'),
+      limit(20)
+    )
+    const unsub = onSnapshot(q, (snap) => {
+      setAccionesCrm(
+        snap.docs.map((d) => {
+          const raw = d.data()
+          let creadoEn: Date | undefined
+          if (raw.creadoEn && typeof raw.creadoEn.toDate === 'function') creadoEn = raw.creadoEn.toDate()
+          return {
+            id: d.id,
+            tipo: raw.tipo || '',
+            datos: raw.datos || {},
+            origen: raw.origen || '',
+            creadoEn,
+          }
+        })
+      )
+    })
+    return () => unsub()
+  }, [telDecoded, isOpen])
+
   async function saveChanges() {
     if (!telDecoded) return
     setSaving(true)
@@ -228,15 +274,57 @@ export function LeadDrawer({ isOpen, onClose, cliente: initialCliente }: LeadDra
     }
   }
 
-  async function setStatusCrmRapido(status: 'perdido' | 'desestimado') {
+  async function setStatusCrmRapidoConMotivo(status: 'perdido' | 'desestimado', motivo: string) {
     if (!cliente || !telDecoded) return
     try {
       await updateDoc(doc(db, 'clientes', telDecoded), {
         statusCrm: status,
         ultimaActualizacion: serverTimestamp(),
       })
+      await addDoc(collection(db, 'clientes', telDecoded, 'acciones_crm'), {
+        tipo: status === 'perdido' ? 'perdido' : 'desestimado',
+        datos: { motivo: motivo || 'Sin motivo especificado' },
+        origen: 'dashboard',
+        creadoEn: serverTimestamp(),
+      })
     } catch (err) {
       console.error(err)
+    }
+  }
+
+  async function guardarSeguimientoDashboard() {
+    if (!cliente || !telDecoded || !seguimientoForm.fecha || !seguimientoForm.texto.trim()) return
+    setSavingSeguimiento(true)
+    try {
+      const runMs = Date.parse(`${seguimientoForm.fecha}T${seguimientoForm.hora}:00-03:00`)
+      if (!Number.isFinite(runMs)) return
+      await addDoc(collection(db, 'mensajes_programados'), {
+        jid: cliente.remoteJid || `${telDecoded}@s.whatsapp.net`,
+        texto: seguimientoForm.texto.trim(),
+        runAt: Timestamp.fromMillis(runMs),
+        estado: 'pendiente',
+        origen: 'dashboard_seguimiento',
+        motivoSeguimiento: seguimientoForm.texto.trim().slice(0, 200),
+        nombreCliente: getDisplayName(cliente),
+        creadoEn: serverTimestamp(),
+      })
+      await updateDoc(doc(db, 'clientes', telDecoded), {
+        proximoContactoAt: new Date(runMs),
+        statusCrm: 'seguimiento',
+        ultimaActualizacion: serverTimestamp(),
+      })
+      await addDoc(collection(db, 'clientes', telDecoded, 'acciones_crm'), {
+        tipo: 'seguimiento_agendado',
+        datos: { texto: seguimientoForm.texto.trim(), runAt: new Date(runMs).toISOString() },
+        origen: 'dashboard',
+        creadoEn: serverTimestamp(),
+      })
+      setSeguimientoModal(false)
+      setSeguimientoForm({ fecha: '', hora: '14:00', texto: '' })
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setSavingSeguimiento(false)
     }
   }
 
@@ -354,17 +442,24 @@ export function LeadDrawer({ isOpen, onClose, cliente: initialCliente }: LeadDra
                       <>
                         <button
                           title="Marcar como Perdido"
-                          onClick={() => setStatusCrmRapido('perdido')}
+                          onClick={() => { setMotivoPerdidaModal('perdido'); setMotivoPerdida('') }}
                           className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
                         >
                           <XCircle className="w-5 h-5" />
                         </button>
                         <button
                           title="Desestimar Lead"
-                          onClick={() => setStatusCrmRapido('desestimado')}
+                          onClick={() => { setMotivoPerdidaModal('desestimado'); setMotivoPerdida('') }}
                           className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-full transition-colors"
                         >
                           <ThumbsDown className="w-5 h-5" />
+                        </button>
+                        <button
+                          title="Agendar seguimiento"
+                          onClick={() => setSeguimientoModal(true)}
+                          className="p-2 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-full transition-colors"
+                        >
+                          <CalendarClock className="w-5 h-5" />
                         </button>
                         <div className="w-px h-6 bg-slate-200 mx-1" />
                       </>
@@ -557,15 +652,37 @@ export function LeadDrawer({ isOpen, onClose, cliente: initialCliente }: LeadDra
                       <div>
                         <label className="label text-xs text-slate-400 uppercase tracking-wider mb-1.5">Próximo contacto</label>
                         {editing ? (
-                          <input
-                            type="date"
-                            className="input"
-                            value={draft.proximoContactoAt ? draft.proximoContactoAt.toISOString().slice(0, 10) : ''}
-                            onChange={(e) => setDraft((d) => ({ ...d, proximoContactoAt: e.target.value ? new Date(`${e.target.value}T12:00:00`) : undefined }))}
-                          />
+                          <div className="flex gap-2">
+                            <input
+                              type="date"
+                              className="input flex-1"
+                              value={draft.proximoContactoAt ? format(draft.proximoContactoAt, 'yyyy-MM-dd') : ''}
+                              onChange={(e) => {
+                                const prev = draft.proximoContactoAt
+                                const hora = prev ? format(prev, 'HH:mm') : '14:00'
+                                setDraft((d) => ({
+                                  ...d,
+                                  proximoContactoAt: e.target.value ? new Date(`${e.target.value}T${hora}:00`) : undefined,
+                                }))
+                              }}
+                            />
+                            <input
+                              type="time"
+                              className="input w-28"
+                              value={draft.proximoContactoAt ? format(draft.proximoContactoAt, 'HH:mm') : '14:00'}
+                              onChange={(e) => {
+                                const prev = draft.proximoContactoAt
+                                const fecha = prev ? format(prev, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd')
+                                setDraft((d) => ({
+                                  ...d,
+                                  proximoContactoAt: new Date(`${fecha}T${e.target.value}:00`),
+                                }))
+                              }}
+                            />
+                          </div>
                         ) : (
                           <p className="text-sm text-slate-700 font-medium">
-                            {cliente.proximoContactoAt ? format(cliente.proximoContactoAt, "d 'de' MMM, yyyy", { locale: es }) : 'Sin recordatorio'}
+                            {cliente.proximoContactoAt ? format(cliente.proximoContactoAt, "d 'de' MMM, yyyy HH:mm", { locale: es }) : 'Sin recordatorio'}
                           </p>
                         )}
                       </div>
@@ -591,6 +708,61 @@ export function LeadDrawer({ isOpen, onClose, cliente: initialCliente }: LeadDra
                       )}
                     </div>
                   </div>
+
+                  {/* Timeline acciones CRM */}
+                  {accionesCrm.length > 0 && (
+                    <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+                      <h3 className="font-semibold text-slate-900 mb-5 flex items-center gap-2">
+                        <History className="w-5 h-5 text-indigo-500" />
+                        Historial CRM ({accionesCrm.length})
+                      </h3>
+                      <div className="space-y-3 max-h-64 overflow-y-auto">
+                        {accionesCrm.map((a) => {
+                          let icon = <Clock className="w-4 h-4 text-slate-400" />
+                          let colorBg = 'bg-slate-50'
+                          if (a.tipo === 'calificacion') {
+                            icon = <Edit2 className="w-4 h-4 text-blue-500" />
+                            colorBg = 'bg-blue-50'
+                          } else if (a.tipo === 'seguimiento_agendado') {
+                            icon = <CalendarClock className="w-4 h-4 text-amber-500" />
+                            colorBg = 'bg-amber-50'
+                          } else if (a.tipo === 'seguimiento_enviado') {
+                            icon = <Send className="w-4 h-4 text-green-500" />
+                            colorBg = 'bg-green-50'
+                          } else if (a.tipo === 'perdido' || a.tipo === 'desestimado') {
+                            icon = <XCircle className="w-4 h-4 text-red-500" />
+                            colorBg = 'bg-red-50'
+                          }
+                          return (
+                            <div key={a.id} className={cn('flex items-start gap-3 p-3 rounded-xl border border-slate-100', colorBg)}>
+                              <div className="mt-0.5 flex-shrink-0">{icon}</div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-slate-800 capitalize">
+                                  {a.tipo.replaceAll('_', ' ')}
+                                </p>
+                                {a.datos.motivo && (
+                                  <p className="text-xs text-slate-600 mt-0.5">{a.datos.motivo}</p>
+                                )}
+                                {a.datos.potencial && (
+                                  <span className="badge text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 mr-1">
+                                    {a.datos.potencial}
+                                  </span>
+                                )}
+                                {a.datos.statusCrm && (
+                                  <span className="badge text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">
+                                    {a.datos.statusCrm.replaceAll('_', ' ')}
+                                  </span>
+                                )}
+                                <p className="text-[10px] text-slate-400 mt-1">
+                                  {a.creadoEn ? formatRelative(a.creadoEn) : ''} — {a.origen}
+                                </p>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Logística leña */}
                   <div className="bg-white rounded-2xl p-6 shadow-sm border border-amber-200 relative overflow-hidden">
@@ -798,6 +970,111 @@ export function LeadDrawer({ isOpen, onClose, cliente: initialCliente }: LeadDra
       {/* Modal secundario de Chat */}
       {showChatModal && cliente && (
         <ChatModal jidDecoded={cliente.remoteJid} onClose={() => setShowChatModal(false)} />
+      )}
+
+      {/* Modal Motivo Pérdida/Desestimación */}
+      {motivoPerdidaModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md border border-slate-100 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
+              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                {motivoPerdidaModal === 'perdido' ? (
+                  <><XCircle className="w-5 h-5 text-red-500" /> Marcar como Perdido</>
+                ) : (
+                  <><ThumbsDown className="w-5 h-5 text-slate-500" /> Desestimar Lead</>
+                )}
+              </h2>
+              <button onClick={() => setMotivoPerdidaModal(null)} className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-1.5 rounded-full transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="label text-xs uppercase tracking-wider mb-1.5">Motivo</label>
+                <textarea
+                  className="input min-h-24 rounded-xl resize-none"
+                  value={motivoPerdida}
+                  onChange={(e) => setMotivoPerdida(e.target.value)}
+                  placeholder={motivoPerdidaModal === 'perdido' ? 'Por qué se pierde este lead...' : 'Por qué se desestima este lead...'}
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 border-t border-slate-100 px-6 py-5 bg-slate-50 rounded-b-3xl">
+              <button onClick={() => setMotivoPerdidaModal(null)} className="btn-secondary rounded-full px-5">Cancelar</button>
+              <button
+                onClick={async () => {
+                  await setStatusCrmRapidoConMotivo(motivoPerdidaModal, motivoPerdida.trim())
+                  setMotivoPerdidaModal(null)
+                  setMotivoPerdida('')
+                }}
+                className={cn(
+                  'rounded-full px-5 shadow-md font-semibold',
+                  motivoPerdidaModal === 'perdido' ? 'btn-primary bg-red-600 hover:bg-red-700' : 'btn-primary bg-slate-600 hover:bg-slate-700'
+                )}
+              >
+                Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Agendar Seguimiento */}
+      {seguimientoModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg border border-slate-100 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
+              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <CalendarClock className="w-5 h-5 text-brand-500" />
+                Agendar seguimiento
+              </h2>
+              <button onClick={() => setSeguimientoModal(false)} className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-1.5 rounded-full transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-5">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="label text-xs uppercase tracking-wider mb-1.5">Fecha</label>
+                  <input
+                    type="date"
+                    className="input rounded-xl"
+                    value={seguimientoForm.fecha}
+                    onChange={(e) => setSeguimientoForm((f) => ({ ...f, fecha: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="label text-xs uppercase tracking-wider mb-1.5">Hora</label>
+                  <input
+                    type="time"
+                    className="input rounded-xl"
+                    value={seguimientoForm.hora}
+                    onChange={(e) => setSeguimientoForm((f) => ({ ...f, hora: e.target.value }))}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="label text-xs uppercase tracking-wider mb-1.5">Mensaje / motivo del seguimiento</label>
+                <textarea
+                  className="input min-h-24 rounded-xl resize-none"
+                  value={seguimientoForm.texto}
+                  onChange={(e) => setSeguimientoForm((f) => ({ ...f, texto: e.target.value }))}
+                  placeholder="Ej: Hola! Te escribo por la consulta de cercos que habíamos charlado..."
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 border-t border-slate-100 px-6 py-5 bg-slate-50 rounded-b-3xl">
+              <button onClick={() => setSeguimientoModal(false)} className="btn-secondary rounded-full px-5">Cancelar</button>
+              <button
+                onClick={guardarSeguimientoDashboard}
+                disabled={savingSeguimiento || !seguimientoForm.fecha || !seguimientoForm.texto.trim()}
+                className="btn-primary rounded-full px-5 shadow-md"
+              >
+                {savingSeguimiento ? 'Guardando...' : 'Programar seguimiento'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </AnimatePresence>
   )

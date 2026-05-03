@@ -41,6 +41,11 @@ service cloud.firestore {
     match /clientes/{tel} {
       allow read: if isViewer();
       allow write: if isOperator();
+
+      match /acciones_crm/{accionId} {
+        allow read: if isViewer();
+        allow write: if isOperator();
+      }
     }
 
     // ── Config (prompts, general) ─────────────────────────────────────────

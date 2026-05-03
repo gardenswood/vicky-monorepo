@@ -5637,8 +5637,30 @@ async function ejecutarCronProgramados() {
         try {
             const jid = p.jid;
             const texto = p.texto || 'Hola! Te escribo como habíamos acordado 😊 — Vicky';
+            const esSeguimiento = p.origen === 'gemini_seguimiento' || p.motivoSeguimiento;
+            if (esSeguimiento) {
+                const st = firestoreModule.getChatSilenceState
+                    ? await firestoreModule.getChatSilenceState(jid).catch(() => null)
+                    : null;
+                if (st?.shouldSilence) {
+                    console.log(`🔇 Seguimiento omitido (silencio activo): ${jid}`);
+                    await firestoreModule.marcarProgramadoEstado(p.id, 'omitido_silencio');
+                    continue;
+                }
+            }
             await sendBotMessage(jid, { text: texto });
             await firestoreModule.marcarProgramadoEstado(p.id, 'enviado');
+            if (esSeguimiento && typeof firestoreModule.addAccionCrm === 'function') {
+                const telCron = docIdClienteFirestore(jid, getCliente(jid));
+                if (telCron) {
+                    firestoreModule.addAccionCrm({
+                        tel: telCron,
+                        tipo: 'seguimiento_enviado',
+                        datos: { texto: texto.slice(0, 200), motivo: p.motivoSeguimiento || null },
+                        origen: 'cron_programados',
+                    }).catch(() => {});
+                }
+            }
             n++;
         } catch (e) {
             console.warn('⚠️ Cron programado:', e.message);
