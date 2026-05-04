@@ -524,407 +524,211 @@ export function LeadDrawer({ isOpen, onClose, cliente: initialCliente }: LeadDra
                 </div>
 
                 {/* Content Scrollable */}
-                <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                  
-                  {/* Datos del Cliente */}
-                  <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
-                    <h3 className="font-semibold text-slate-900 mb-5 flex items-center gap-2">
-                      <MapPin className="w-5 h-5 text-brand-500" />
-                      Datos de ubicación y pago
-                    </h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                      <div>
-                        <label className="label text-xs text-slate-400 uppercase tracking-wider mb-1.5">Dirección</label>
-                        {editing ? (
-                          <input
-                            type="text"
-                            className="input"
-                            value={draft.direccion ?? ''}
-                            onChange={(e) => setDraft((d) => ({ ...d, direccion: e.target.value }))}
-                          />
-                        ) : (
-                          <p className="text-sm text-slate-700 font-medium">
-                            {cliente.direccion || <span className="text-slate-400 font-normal">Sin dirección</span>}
-                          </p>
-                        )}
-                      </div>
-                      <div>
-                        <label className="label text-xs text-slate-400 uppercase tracking-wider mb-1.5">Zona</label>
-                        {editing ? (
-                          <input
-                            type="text"
-                            className="input"
-                            value={draft.zona ?? ''}
-                            onChange={(e) => setDraft((d) => ({ ...d, zona: e.target.value }))}
-                          />
-                        ) : (
-                          <p className="text-sm text-slate-700 font-medium">
-                            {cliente.zona || <span className="text-slate-400 font-normal">Sin zona</span>}
-                          </p>
-                        )}
-                      </div>
-                      <div>
-                        <label className="label text-xs text-slate-400 uppercase tracking-wider mb-1.5">Estado Lead</label>
-                        {editing ? (
-                          <select
-                            className="input"
-                            value={draft.estado ?? ''}
-                            onChange={(e) => setDraft((d) => ({ ...d, estado: e.target.value }))}
-                          >
-                            {Object.entries(ESTADO_LABELS).map(([key, label]) => (
-                              <option key={key} value={key}>
-                                {label}
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          <span className={cn('badge text-xs px-2.5 py-1 rounded-full', ESTADO_COLORS[cliente.estado ?? ''] ?? 'bg-slate-100 text-slate-600')}>
-                            {ESTADO_LABELS[cliente.estado ?? ''] ?? cliente.estado}
-                          </span>
-                        )}
-                      </div>
-                      <div>
-                        <label className="label text-xs text-slate-400 uppercase tracking-wider mb-1.5">Método de pago</label>
-                        <p className="text-sm text-slate-700 capitalize font-medium">
-                          {cliente.metodoPago || <span className="text-slate-400 font-normal">No especificado</span>}
-                        </p>
-                      </div>
-                    </div>
+                <div className="flex-1 overflow-y-auto p-6 space-y-5">
 
-                    <div className="mt-5 pt-5 border-t border-slate-100">
-                      <label className="label text-xs text-slate-400 uppercase tracking-wider mb-2">Notas internas</label>
-                      {editing ? (
-                        <textarea
-                          className="w-full h-32 p-4 bg-yellow-50 border border-yellow-200 rounded-xl text-slate-700 text-sm resize-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent placeholder:text-yellow-600/50 shadow-inner"
-                          value={draft.notas ?? ''}
-                          onChange={(e) => setDraft((d) => ({ ...d, notas: e.target.value }))}
-                          placeholder="Notas sobre este cliente..."
-                        />
-                      ) : (
-                        <div className="text-sm text-slate-700 bg-yellow-50 rounded-xl p-4 border border-yellow-100 shadow-inner min-h-[80px] whitespace-pre-wrap">
-                          {cliente.notas || <span className="text-yellow-600/50 italic">Sin notas registradas</span>}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* CRM Comercial */}
-                  <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
-                    <h3 className="font-semibold text-slate-900 mb-5 flex items-center gap-2">
-                      <Clock className="w-5 h-5 text-blue-500" />
-                      CRM comercial
-                    </h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                  {/* Datos principales + Notas */}
+                  <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
-                        <label className="label text-xs text-slate-400 uppercase tracking-wider mb-1.5">Potencial</label>
+                        <label className="text-[10px] text-slate-400 uppercase tracking-wider">Zona</label>
                         {editing ? (
-                          <select
-                            className="input"
-                            value={draft.potencial ?? ''}
-                            onChange={(e) => setDraft((d) => ({ ...d, potencial: e.target.value }))}
-                          >
+                          <input type="text" className="input mt-1" value={draft.zona ?? ''} onChange={(e) => setDraft((d) => ({ ...d, zona: e.target.value }))} />
+                        ) : (
+                          <p className="text-sm text-slate-700 font-medium mt-0.5">{cliente.zona || <span className="text-slate-400">Sin zona</span>}</p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-slate-400 uppercase tracking-wider">Dirección</label>
+                        {editing ? (
+                          <input type="text" className="input mt-1" value={draft.direccion ?? ''} onChange={(e) => setDraft((d) => ({ ...d, direccion: e.target.value }))} />
+                        ) : (
+                          <p className="text-sm text-slate-700 font-medium mt-0.5">{cliente.direccion || <span className="text-slate-400">Sin dirección</span>}</p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-slate-400 uppercase tracking-wider">Potencial</label>
+                        {editing ? (
+                          <select className="input mt-1" value={draft.potencial ?? ''} onChange={(e) => setDraft((d) => ({ ...d, potencial: e.target.value }))}>
                             <option value="">Sin definir</option>
                             <option value="frio">Frío</option>
                             <option value="tibio">Tibio</option>
                             <option value="caliente">Caliente</option>
                           </select>
                         ) : (
-                          <span className="badge text-xs px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-100 font-medium">
+                          <span className="badge text-xs px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-100 font-medium mt-1 inline-block">
                             {cliente.potencial || 'Sin definir'}
                           </span>
                         )}
                       </div>
                       <div>
-                        <label className="label text-xs text-slate-400 uppercase tracking-wider mb-1.5">Estado CRM</label>
+                        <label className="text-[10px] text-slate-400 uppercase tracking-wider">Estado CRM</label>
                         {editing ? (
-                          <select
-                            className="input"
-                            value={draft.statusCrm ?? ''}
-                            onChange={(e) => setDraft((d) => ({ ...d, statusCrm: e.target.value }))}
-                          >
+                          <select className="input mt-1" value={draft.statusCrm ?? ''} onChange={(e) => setDraft((d) => ({ ...d, statusCrm: e.target.value }))}>
                             <option value="">Sin definir</option>
-                            <option value="pendiente_cotizacion">⏱️ Pendiente cotización</option>
-                            <option value="seguimiento">👀 Seguimiento</option>
-                            <option value="concreto">🎯 Concreto</option>
-                            <option value="perdido">❌ Perdido</option>
-                            <option value="desestimado">👎 Desestimado</option>
+                            <option value="pendiente_cotizacion">Pendiente cotización</option>
+                            <option value="seguimiento">Seguimiento</option>
+                            <option value="concreto">Concreto</option>
+                            <option value="perdido">Perdido</option>
+                            <option value="desestimado">Desestimado</option>
                           </select>
                         ) : (
-                          <span className={cn('badge text-xs px-2.5 py-1 rounded-full border', STATUS_CRM_COLORS[cliente.statusCrm ?? ''] ?? 'bg-slate-100 text-slate-600')}>
-                            {STATUS_CRM_LABELS[cliente.statusCrm ?? ''] ?? cliente.statusCrm?.replaceAll('_', ' ') ?? 'Sin definir'}
+                          <span className={cn('badge text-xs px-2.5 py-1 rounded-full border font-medium mt-1 inline-block', STATUS_CRM_COLORS[cliente.statusCrm ?? ''] ?? 'bg-slate-100 text-slate-600')}>
+                            {STATUS_CRM_LABELS[cliente.statusCrm ?? ''] ?? 'Sin definir'}
                           </span>
                         )}
                       </div>
                       <div>
-                        <label className="label text-xs text-slate-400 uppercase tracking-wider mb-1.5">Urgencia</label>
+                        <label className="text-[10px] text-slate-400 uppercase tracking-wider">Próximo contacto</label>
                         {editing ? (
-                          <select
-                            className="input"
-                            value={draft.urgencia ?? ''}
-                            onChange={(e) => setDraft((d) => ({ ...d, urgencia: e.target.value }))}
-                          >
-                            <option value="">Sin definir</option>
-                            <option value="alta">Alta</option>
-                            <option value="media">Media</option>
-                            <option value="baja">Baja</option>
-                          </select>
-                        ) : (
-                          <p className="text-sm text-slate-700 font-medium capitalize">{cliente.urgencia || 'Sin definir'}</p>
-                        )}
-                      </div>
-                      <div>
-                        <label className="label text-xs text-slate-400 uppercase tracking-wider mb-1.5">Próximo contacto</label>
-                        {editing ? (
-                          <div className="flex gap-2">
-                            <input
-                              type="date"
-                              className="input flex-1"
-                              value={draft.proximoContactoAt ? format(draft.proximoContactoAt, 'yyyy-MM-dd') : ''}
+                          <div className="flex gap-2 mt-1">
+                            <input type="date" className="input flex-1" value={draft.proximoContactoAt ? format(draft.proximoContactoAt, 'yyyy-MM-dd') : ''}
                               onChange={(e) => {
                                 const prev = draft.proximoContactoAt
                                 const hora = prev ? format(prev, 'HH:mm') : '14:00'
-                                setDraft((d) => ({
-                                  ...d,
-                                  proximoContactoAt: e.target.value ? new Date(`${e.target.value}T${hora}:00`) : undefined,
-                                }))
+                                setDraft((d) => ({ ...d, proximoContactoAt: e.target.value ? new Date(`${e.target.value}T${hora}:00`) : undefined }))
                               }}
                             />
-                            <input
-                              type="time"
-                              className="input w-28"
-                              value={draft.proximoContactoAt ? format(draft.proximoContactoAt, 'HH:mm') : '14:00'}
+                            <input type="time" className="input w-28" value={draft.proximoContactoAt ? format(draft.proximoContactoAt, 'HH:mm') : '14:00'}
                               onChange={(e) => {
                                 const prev = draft.proximoContactoAt
                                 const fecha = prev ? format(prev, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd')
-                                setDraft((d) => ({
-                                  ...d,
-                                  proximoContactoAt: new Date(`${fecha}T${e.target.value}:00`),
-                                }))
+                                setDraft((d) => ({ ...d, proximoContactoAt: new Date(`${fecha}T${e.target.value}:00`) }))
                               }}
                             />
                           </div>
                         ) : (
-                          <p className="text-sm text-slate-700 font-medium">
+                          <p className="text-sm text-slate-700 font-medium mt-0.5">
                             {cliente.proximoContactoAt ? format(cliente.proximoContactoAt, "d 'de' MMM, yyyy HH:mm", { locale: es }) : 'Sin recordatorio'}
                           </p>
                         )}
                       </div>
+                      <div>
+                        <label className="text-[10px] text-slate-400 uppercase tracking-wider">Último contacto</label>
+                        <p className="text-sm text-slate-700 mt-0.5">
+                          {cliente.fechaUltimoContacto ? <>{format(cliente.fechaUltimoContacto, "d MMM yyyy", { locale: es })} <span className="text-slate-400">({formatRelative(cliente.fechaUltimoContacto)})</span></> : '—'}
+                        </p>
+                      </div>
                     </div>
-                    <div className="mt-5 pt-5 border-t border-slate-100">
-                      <label className="label text-xs text-slate-400 uppercase tracking-wider mb-2">Intereses / productos consultados</label>
+
+                    {/* Intereses */}
+                    <div className="mt-4 pt-4 border-t border-slate-100">
+                      <label className="text-[10px] text-slate-400 uppercase tracking-wider mb-1.5 block">Intereses</label>
                       {editing ? (
-                        <input
-                          className="input"
-                          value={(draft.interes || []).join(', ')}
-                          onChange={(e) => setDraft((d) => ({
-                            ...d,
-                            interes: e.target.value.split(',').map((x) => x.trim().toLowerCase()).filter(Boolean),
-                          }))}
+                        <input className="input" value={(draft.interes || []).join(', ')}
+                          onChange={(e) => setDraft((d) => ({ ...d, interes: e.target.value.split(',').map((x) => x.trim().toLowerCase()).filter(Boolean) }))}
                           placeholder="lena, cerco, pergola..."
                         />
                       ) : (
-                        <div className="flex flex-wrap gap-2">
+                        <div className="flex flex-wrap gap-1.5">
                           {(cliente.interes || []).length > 0 ? cliente.interes?.map((i) => (
-                            <span key={i} className="badge px-3 py-1 rounded-full text-xs bg-slate-100 text-slate-600 font-medium border border-slate-200 shadow-sm">{i}</span>
-                          )) : <span className="text-sm text-slate-400 italic">Sin intereses registrados</span>}
+                            <span key={i} className="badge px-2.5 py-0.5 rounded-full text-xs bg-slate-100 text-slate-700 font-medium">{i}</span>
+                          )) : <span className="text-xs text-slate-400 italic">Sin intereses</span>}
                         </div>
                       )}
                     </div>
+
+                    {/* Notas internas */}
+                    <div className="mt-4 pt-4 border-t border-slate-100">
+                      <label className="text-[10px] text-slate-400 uppercase tracking-wider mb-1.5 block">Notas internas</label>
+                      {editing ? (
+                        <textarea
+                          className="w-full h-24 p-3 bg-yellow-50 border border-yellow-200 rounded-xl text-slate-700 text-sm resize-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent"
+                          value={draft.notas ?? ''}
+                          onChange={(e) => setDraft((d) => ({ ...d, notas: e.target.value }))}
+                          placeholder="Notas sobre este cliente..."
+                        />
+                      ) : (
+                        <div className="text-sm text-slate-700 bg-yellow-50 rounded-xl p-3 border border-yellow-100 min-h-[60px] whitespace-pre-wrap">
+                          {cliente.notas || <span className="text-yellow-600/50 italic">Sin notas</span>}
+                        </div>
+                      )}
+                    </div>
+
+                    {editing && (
+                      <div className="mt-4 pt-4 border-t border-slate-100">
+                        <label className="text-[10px] text-slate-400 uppercase tracking-wider">Estado Lead (kanban)</label>
+                        <select className="input mt-1" value={draft.estado ?? ''} onChange={(e) => setDraft((d) => ({ ...d, estado: e.target.value }))}>
+                          {Object.entries(ESTADO_LABELS).map(([key, label]) => (
+                            <option key={key} value={key}>{label}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
                   </div>
 
-                  {/* Timeline acciones CRM */}
-                  {accionesCrm.length > 0 && (
-                    <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
-                      <h3 className="font-semibold text-slate-900 mb-5 flex items-center gap-2">
-                        <History className="w-5 h-5 text-indigo-500" />
-                        Historial CRM ({accionesCrm.length})
+                  {/* Logística leña */}
+                  {(consultasLena.length > 0 || cliente.interes?.includes('lena') || cliente.servicioPendiente === 'lena') && (
+                    <div className="bg-white rounded-2xl p-5 shadow-sm border border-amber-200">
+                      <h3 className="font-semibold text-slate-900 mb-3 text-sm flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4 text-amber-600" />
+                        Leña
                       </h3>
-                      <div className="space-y-3 max-h-64 overflow-y-auto">
+                      {consultasLena.length > 0 ? (
+                        <div className="space-y-3">
+                          <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-sm text-amber-800">
+                            <span className="font-semibold">{consultasLena.reduce((sum, c) => sum + c.cantidadKg, 0)} kg</span> en {consultasLena[0].zona} — <span className="capitalize">{consultasLena[0].estado.replaceAll('_', ' ')}</span>
+                          </div>
+                          <Link href="/logistica-zonas" className="btn-secondary w-full justify-center flex items-center gap-1.5 rounded-lg text-sm py-2">
+                            Ver reparto de leña
+                          </Link>
+                        </div>
+                      ) : (
+                        <button onClick={openConsultaModal} className="btn-secondary w-full flex items-center justify-center gap-1.5 rounded-lg border-dashed text-sm py-2">
+                          <Plus className="w-4 h-4" /> Registrar para reparto
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Pedidos anteriores */}
+                  {cliente.pedidosAnteriores && cliente.pedidosAnteriores.length > 0 && (
+                    <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
+                      <h3 className="font-semibold text-slate-900 mb-3 text-sm flex items-center gap-2">
+                        <Package className="w-4 h-4 text-purple-500" />
+                        Pedidos ({cliente.pedidosAnteriores.length})
+                      </h3>
+                      <div className="space-y-2">
+                        {cliente.pedidosAnteriores.map((p, i) => (
+                          <div key={i} className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg text-sm">
+                            <span className="text-brand-600 font-bold text-xs">#{i + 1}</span>
+                            <div className="flex-1 min-w-0">
+                              <span className="font-medium text-slate-800">{SERVICIO_LABELS[p.servicio] ?? p.servicio}</span>
+                              {p.descripcion && <span className="text-slate-500 ml-1.5">— {p.descripcion}</span>}
+                            </div>
+                            {p.fecha && <span className="text-[10px] text-slate-400 flex-shrink-0">{formatRelative(p.fecha)}</span>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Historial CRM */}
+                  {accionesCrm.length > 0 && (
+                    <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
+                      <h3 className="font-semibold text-slate-900 mb-3 text-sm flex items-center gap-2">
+                        <History className="w-4 h-4 text-indigo-500" />
+                        Historial ({accionesCrm.length})
+                      </h3>
+                      <div className="space-y-2 max-h-52 overflow-y-auto">
                         {accionesCrm.map((a) => {
-                          let icon = <Clock className="w-4 h-4 text-slate-400" />
+                          let icon = <Clock className="w-3.5 h-3.5 text-slate-400" />
                           let colorBg = 'bg-slate-50'
-                          if (a.tipo === 'calificacion') {
-                            icon = <Edit2 className="w-4 h-4 text-blue-500" />
-                            colorBg = 'bg-blue-50'
-                          } else if (a.tipo === 'seguimiento_agendado') {
-                            icon = <CalendarClock className="w-4 h-4 text-amber-500" />
-                            colorBg = 'bg-amber-50'
-                          } else if (a.tipo === 'seguimiento_enviado') {
-                            icon = <Send className="w-4 h-4 text-green-500" />
-                            colorBg = 'bg-green-50'
-                          } else if (a.tipo === 'perdido' || a.tipo === 'desestimado') {
-                            icon = <XCircle className="w-4 h-4 text-red-500" />
-                            colorBg = 'bg-red-50'
-                          }
+                          if (a.tipo === 'calificacion') { icon = <Edit2 className="w-3.5 h-3.5 text-blue-500" />; colorBg = 'bg-blue-50' }
+                          else if (a.tipo.includes('seguimiento')) { icon = <CalendarClock className="w-3.5 h-3.5 text-amber-500" />; colorBg = 'bg-amber-50' }
+                          else if (a.tipo === 'perdido' || a.tipo === 'desestimado') { icon = <XCircle className="w-3.5 h-3.5 text-red-500" />; colorBg = 'bg-red-50' }
+                          else if (a.tipo.includes('lena') || a.tipo.includes('pedido')) { icon = <Package className="w-3.5 h-3.5 text-purple-500" />; colorBg = 'bg-purple-50' }
                           return (
-                            <div key={a.id} className={cn('flex items-start gap-3 p-3 rounded-xl border border-slate-100', colorBg)}>
-                              <div className="mt-0.5 flex-shrink-0">{icon}</div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-slate-800 capitalize">
-                                  {a.tipo.replaceAll('_', ' ')}
-                                </p>
-                                {a.datos.motivo && (
-                                  <p className="text-xs text-slate-600 mt-0.5">{a.datos.motivo}</p>
-                                )}
-                                {a.datos.potencial && (
-                                  <span className="badge text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 mr-1">
-                                    {a.datos.potencial}
-                                  </span>
-                                )}
-                                {a.datos.statusCrm && typeof a.datos.statusCrm === 'string' && (
-                                  <span className="badge text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">
-                                    {a.datos.statusCrm.replaceAll('_', ' ')}
-                                  </span>
-                                )}
-                                <p className="text-[10px] text-slate-400 mt-1">
-                                  {a.creadoEn ? formatRelative(a.creadoEn) : ''} — {a.origen}
-                                </p>
-                              </div>
+                            <div key={a.id} className={cn('flex items-center gap-2.5 p-2.5 rounded-lg text-xs', colorBg)}>
+                              {icon}
+                              <span className="font-medium text-slate-700 capitalize">{a.tipo.replaceAll('_', ' ')}</span>
+                              {a.datos.motivo && <span className="text-slate-500 truncate flex-1">— {a.datos.motivo}</span>}
+                              <span className="text-slate-400 flex-shrink-0">{a.creadoEn ? formatRelative(a.creadoEn) : ''}</span>
                             </div>
                           )
                         })}
                       </div>
                     </div>
                   )}
-
-                  {/* Logística leña */}
-                  <div className="bg-white rounded-2xl p-6 shadow-sm border border-amber-200 relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-24 h-24 bg-amber-50 rounded-bl-full -z-0" />
-                    <h3 className="font-semibold text-slate-900 mb-4 text-sm flex items-center gap-2 relative z-10">
-                      <AlertTriangle className="w-5 h-5 text-amber-600" />
-                      Logística leña
-                    </h3>
-                    {consultasLena.length > 0 ? (
-                      <div className="space-y-4 relative z-10">
-                        <div className="rounded-xl bg-amber-50 border border-amber-200 p-5 text-sm text-amber-800 shadow-sm">
-                          <p className="font-bold flex items-center gap-2 text-base">
-                            <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" />
-                            Consulta activa
-                          </p>
-                          <p className="mt-3 leading-relaxed">
-                            <span className="font-semibold">{consultasLena.reduce((sum, c) => sum + c.cantidadKg, 0)} kg</span> en {consultasLena[0].zona}.<br />
-                            Estado: <span className="capitalize font-medium">{consultasLena[0].estado.replaceAll('_', ' ')}</span>
-                          </p>
-                        </div>
-                        <Link href="/logistica-zonas" className="btn-secondary w-full justify-center flex items-center gap-1.5 rounded-xl bg-white shadow-sm border-slate-200 hover:border-amber-300 hover:text-amber-700 py-2.5">
-                          Ver reparto de leña
-                        </Link>
-                      </div>
-                    ) : (
-                      <div className="space-y-4 relative z-10">
-                        <p className="text-slate-500 text-sm italic">Sin consulta logística activa.</p>
-                        <button onClick={openConsultaModal} className="btn-secondary w-full flex items-center justify-center gap-1.5 rounded-xl border border-dashed border-slate-300 hover:border-brand-300 hover:text-brand-600 bg-white py-2.5">
-                          <Plus className="w-4 h-4" /> Registrar para reparto
-                        </button>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Pedidos Anteriores */}
-                  <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
-                    <h3 className="font-semibold text-slate-900 mb-5 flex items-center gap-2">
-                      <Package className="w-5 h-5 text-purple-500" />
-                      Pedidos anteriores ({cliente.pedidosAnteriores?.length ?? 0})
-                    </h3>
-                    {!cliente.pedidosAnteriores || cliente.pedidosAnteriores.length === 0 ? (
-                      <div className="p-6 text-center bg-slate-50 rounded-xl border border-slate-200 border-dashed">
-                        <Package className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                        <p className="text-slate-400 text-sm">Sin pedidos registrados</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {cliente.pedidosAnteriores.map((p, i) => (
-                          <div key={i} className="flex items-start gap-4 p-4 bg-white border border-slate-100 rounded-xl shadow-sm hover:border-brand-200 transition-colors">
-                            <div className="w-10 h-10 bg-brand-50 rounded-full flex items-center justify-center flex-shrink-0 text-brand-600 font-bold border border-brand-100">
-                              #{i + 1}
-                            </div>
-                            <div className="flex-1">
-                              <p className="text-sm font-bold text-slate-900">
-                                {SERVICIO_LABELS[p.servicio] ?? p.servicio}
-                              </p>
-                              <p className="text-sm text-slate-600 mt-1 leading-snug">{p.descripcion}</p>
-                              <div className="flex items-center gap-4 mt-2">
-                                {p.monto && (
-                                  <span className="text-xs font-semibold text-green-700 bg-green-50 px-2 py-0.5 rounded-md flex items-center gap-1">
-                                    <DollarSign className="w-3 h-3" />
-                                    ${p.monto.toLocaleString('es-AR')}
-                                  </span>
-                                )}
-                                {p.fecha && (
-                                  <span className="text-xs text-slate-500 flex items-center gap-1.5">
-                                    <Clock className="w-3.5 h-3.5 text-slate-400" />
-                                    {formatRelative(p.fecha)}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Identidad WhatsApp & Actividad */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                    <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
-                      <h3 className="font-semibold text-slate-900 mb-4 text-sm flex items-center gap-2">
-                        <Phone className="w-4 h-4 text-slate-400" />
-                        Identidad WhatsApp
-                      </h3>
-                      <div className="space-y-3 text-sm">
-                        <div>
-                          <p className="text-xs text-slate-400 uppercase tracking-wider mb-0.5">Nombre visible</p>
-                          <p className="text-slate-800 font-medium">{nombreVisible}</p>
-                        </div>
-                        {cliente.pushName && cliente.pushName !== cliente.nombre && (
-                          <div>
-                            <p className="text-xs text-slate-400 uppercase tracking-wider mb-0.5">Nombre WhatsApp / agenda</p>
-                            <p className="text-slate-800">{cliente.pushName}</p>
-                          </div>
-                        )}
-                        <div>
-                          <p className="text-xs text-slate-400 uppercase tracking-wider mb-0.5">Teléfono real</p>
-                          <p className="text-slate-800 font-medium">{telefonoVisible || 'Sin teléfono resuelto'}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-slate-400 uppercase tracking-wider mb-0.5">Identificador técnico</p>
-                          <p className="text-slate-500 text-xs break-all bg-slate-50 p-1.5 rounded mt-1 border border-slate-100">
-                            {identidadSecundaria || '—'}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
-                      <h3 className="font-semibold text-slate-900 mb-4 text-sm flex items-center gap-2">
-                        <Clock className="w-4 h-4 text-slate-400" />
-                        Actividad
-                      </h3>
-                      <div className="space-y-4">
-                        {[
-                          { label: 'Primer contacto', value: cliente.fechaPrimerContacto },
-                          { label: 'Último contacto', value: cliente.fechaUltimoContacto },
-                        ].map(({ label, value }) => (
-                          <div key={label} className="relative pl-4 border-l-2 border-brand-100">
-                            <div className="absolute w-2 h-2 bg-brand-400 rounded-full -left-[5px] top-1.5 ring-4 ring-white" />
-                            <p className="text-xs text-slate-400 uppercase tracking-wider mb-0.5">{label}</p>
-                            <p className="text-sm text-slate-800 font-medium">
-                              {value ? format(value, "d 'de' MMMM, yyyy", { locale: es }) : '—'}
-                            </p>
-                            {value && (
-                              <p className="text-xs text-slate-400 mt-0.5">{formatRelative(value)}</p>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                      <div className="mt-4 pt-4 border-t border-slate-100">
-                        <p className="text-xs text-slate-600 flex items-center gap-2 bg-slate-50 py-2 px-3 rounded-lg border border-slate-100">
-                          <span className={cn('w-2.5 h-2.5 rounded-full shadow-sm', cliente.audioIntroEnviado ? 'bg-green-500' : 'bg-slate-300')} />
-                          Audio intro {cliente.audioIntroEnviado ? 'enviado' : 'pendiente'}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
 
                 </div>
               </>
