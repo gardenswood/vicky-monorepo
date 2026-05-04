@@ -1,14 +1,16 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import {
   collection,
   query,
   orderBy,
   onSnapshot,
   doc,
+  setDoc,
   updateDoc,
   Timestamp,
+  deleteField,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import {
@@ -19,7 +21,6 @@ import {
   Package,
   Clock,
   BellOff,
-  Bell,
   Mic,
   Image as ImageIcon,
   FileText,
@@ -27,9 +28,9 @@ import {
   X,
   ThumbsUp,
   ThumbsDown,
+  HandHelping,
 } from 'lucide-react'
 import { format } from 'date-fns'
-import { es } from 'date-fns/locale'
 import { cn, SERVICIO_LABELS, ESTADO_LABELS, ESTADO_COLORS, formatRelative, getTelFromJid } from '@/lib/utils'
 
 interface Mensaje {
@@ -66,21 +67,31 @@ export default function ChatModal({ jidDecoded, onClose }: ChatModalProps) {
 
   const [mensajes, setMensajes] = useState<Mensaje[]>([])
   const [chatInfo, setChatInfo] = useState<ChatInfo | null>(null)
+  const [botSilenciado, setBotSilenciado] = useState(false)
   const [loading, setLoading] = useState(true)
   const [toggling, setToggling] = useState(false)
+  const [solicitando, setSolicitando] = useState(false)
+  const [asistenciaSolicitada, setAsistenciaSolicitada] = useState(false)
 
   useEffect(() => {
     const chatRef = doc(db, 'chats', jidDecoded)
     const unsubChat = onSnapshot(chatRef, (snap) => {
       if (snap.exists()) {
         const d = snap.data()
+        const humano = d.humanoAtendiendo === true
+        const silenciadoHasta = d.silenciadoHasta?.toDate?.() ?? null
+        const silenciadoPorTiempo = silenciadoHasta ? silenciadoHasta.getTime() > Date.now() : false
+        setBotSilenciado(humano || silenciadoPorTiempo)
+        if (!humano && !silenciadoPorTiempo) {
+          setAsistenciaSolicitada(false)
+        }
         setChatInfo({
           jid: jidDecoded,
           tel: d.tel || getTelFromJid(jidDecoded),
           nombre: d.nombre,
           estado: d.estado,
           servicioPendiente: d.servicioPendiente,
-          humanoAtendiendo: d.humanoAtendiendo,
+          humanoAtendiendo: humano,
           direccion: d.direccion,
           zona: d.zona,
           metodoPago: d.metodoPago,
@@ -113,23 +124,37 @@ export default function ChatModal({ jidDecoded, onClose }: ChatModalProps) {
     }
   }, [jidDecoded])
 
-  async function toggleBotSilencio() {
-    if (!chatInfo) return
+  const silenciarBot = useCallback(async () => {
     setToggling(true)
     try {
       const chatRef = doc(db, 'chats', jidDecoded)
-      await updateDoc(chatRef, {
-        humanoAtendiendo: !chatInfo.humanoAtendiendo,
-        silenciadoHasta: !chatInfo.humanoAtendiendo
-          ? Timestamp.fromDate(new Date(Date.now() + 24 * 60 * 60 * 1000))
-          : null,
-      })
+      await setDoc(chatRef, {
+        humanoAtendiendo: true,
+        silenciadoHasta: Timestamp.fromDate(new Date(Date.now() + 24 * 60 * 60 * 1000)),
+      }, { merge: true })
     } catch (err) {
       console.error(err)
     } finally {
       setToggling(false)
     }
-  }
+  }, [jidDecoded])
+
+  const solicitarAsistenciaVicky = useCallback(async () => {
+    setSolicitando(true)
+    try {
+      const chatRef = doc(db, 'chats', jidDecoded)
+      await setDoc(chatRef, {
+        humanoAtendiendo: false,
+        humanoAtendiendoAt: deleteField(),
+        silenciadoHasta: deleteField(),
+      }, { merge: true })
+      setAsistenciaSolicitada(true)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setSolicitando(false)
+    }
+  }, [jidDecoded])
 
   async function handleFeedback(msgId: string, feedback: 'good' | 'bad') {
     try {
@@ -190,9 +215,14 @@ export default function ChatModal({ jidDecoded, onClose }: ChatModalProps) {
               <h2 className="font-bold text-lg text-slate-900 truncate">
                 {chatInfo?.nombre || chatInfo?.tel || 'Cliente'}
               </h2>
-              {chatInfo?.humanoAtendiendo && (
+              {botSilenciado && (
                 <span className="badge bg-orange-100 text-orange-700 text-xs px-2 py-0.5 rounded-full">
-                  👤 Humano atendiendo
+                  <User className="w-3 h-3 inline mr-0.5" /> Humano atendiendo
+                </span>
+              )}
+              {!botSilenciado && asistenciaSolicitada && (
+                <span className="badge bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full">
+                  <Bot className="w-3 h-3 inline mr-0.5" /> Vicky activa
                 </span>
               )}
               {chatInfo?.estado && (
@@ -217,22 +247,25 @@ export default function ChatModal({ jidDecoded, onClose }: ChatModalProps) {
               <span className="hidden sm:inline">WhatsApp</span>
             </a>
 
-            <button
-              onClick={toggleBotSilencio}
-              disabled={toggling}
-              className={cn(
-                'flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-colors shadow-sm',
-                chatInfo?.humanoAtendiendo
-                  ? 'bg-green-50 text-green-700 hover:bg-green-100 border border-green-200'
-                  : 'bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-200'
-              )}
-            >
-              {chatInfo?.humanoAtendiendo ? (
-                <><Bell className="w-4 h-4" /> <span className="hidden sm:inline">Reactivar bot</span></>
-              ) : (
-                <><BellOff className="w-4 h-4" /> <span className="hidden sm:inline">Silenciar bot</span></>
-              )}
-            </button>
+            {botSilenciado ? (
+              <button
+                onClick={solicitarAsistenciaVicky}
+                disabled={solicitando}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-colors shadow-sm bg-brand-50 text-brand-700 hover:bg-brand-100 border border-brand-200"
+              >
+                <HandHelping className="w-4 h-4" />
+                <span className="hidden sm:inline">Pedir asistencia Vicky</span>
+              </button>
+            ) : (
+              <button
+                onClick={silenciarBot}
+                disabled={toggling}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-colors shadow-sm bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-200"
+              >
+                <BellOff className="w-4 h-4" />
+                <span className="hidden sm:inline">Silenciar bot</span>
+              </button>
+            )}
             <div className="w-px h-6 bg-slate-200 mx-1" />
             <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors">
               <X className="w-6 h-6" />
@@ -340,6 +373,38 @@ export default function ChatModal({ jidDecoded, onClose }: ChatModalProps) {
               ))
             )}
             <div ref={bottomRef} className="h-4" />
+
+            {/* Banner de asistencia dentro del scroll */}
+            {botSilenciado && (
+              <div className="sticky bottom-0 bg-amber-50/95 backdrop-blur-sm border-t border-amber-200 px-4 py-3 -mx-6 mt-2">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <User className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                    <p className="text-sm font-medium text-amber-800 truncate">Vicky en silencio — Humano atendiendo</p>
+                  </div>
+                  <button
+                    onClick={solicitarAsistenciaVicky}
+                    disabled={solicitando}
+                    className="flex items-center gap-1.5 px-3 py-2 bg-brand-600 text-white rounded-xl text-sm font-semibold hover:bg-brand-700 transition-colors shadow-sm flex-shrink-0 disabled:opacity-50"
+                  >
+                    <Bot className="w-3.5 h-3.5" />
+                    Solicitar asistencia
+                  </button>
+                </div>
+                <p className="text-[11px] text-amber-500 mt-1 ml-6">
+                  Si respondés desde el teléfono, Vicky se silenciará automáticamente.
+                </p>
+              </div>
+            )}
+
+            {!botSilenciado && asistenciaSolicitada && (
+              <div className="sticky bottom-0 bg-green-50/95 backdrop-blur-sm border-t border-green-200 px-4 py-2 -mx-6 mt-2">
+                <div className="flex items-center gap-2">
+                  <Bot className="w-4 h-4 text-green-600" />
+                  <p className="text-sm text-green-700 font-medium">Vicky responderá al próximo mensaje</p>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Client info panel */}

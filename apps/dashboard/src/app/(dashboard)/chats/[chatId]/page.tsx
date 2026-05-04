@@ -1,7 +1,7 @@
 'use client'
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import {
   collection,
@@ -10,15 +10,16 @@ import {
   onSnapshot,
   doc,
   updateDoc,
+  setDoc,
   Timestamp,
   getDoc,
+  deleteField,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import {
   Bot,
   User,
   BellOff,
-  Bell,
   Mic,
   Image as ImageIcon,
   FileText,
@@ -26,9 +27,9 @@ import {
   PanelRightOpen,
   ThumbsUp,
   ThumbsDown,
+  HandHelping,
 } from 'lucide-react'
 import { format } from 'date-fns'
-import { es } from 'date-fns/locale'
 import { cn, SERVICIO_LABELS, ESTADO_LABELS, ESTADO_COLORS, formatRelative, getTelFromJid } from '@/lib/utils'
 import { LeadDrawer } from '@/components/LeadDrawer'
 
@@ -50,8 +51,11 @@ export default function ChatDetailPage() {
 
   const [mensajes, setMensajes] = useState<Mensaje[]>([])
   const [chatInfo, setChatInfo] = useState<any>(null)
+  const [botSilenciado, setBotSilenciado] = useState(false)
   const [loading, setLoading] = useState(true)
   const [toggling, setToggling] = useState(false)
+  const [solicitando, setSolicitando] = useState(false)
+  const [asistenciaSolicitada, setAsistenciaSolicitada] = useState(false)
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
 
   useEffect(() => {
@@ -66,7 +70,6 @@ export default function ChatDetailPage() {
           nombre: d.nombre,
           estado: d.estado,
           servicioPendiente: d.servicioPendiente,
-          humanoAtendiendo: d.humanoAtendiendo,
           direccion: d.direccion,
           zona: d.zona,
           metodoPago: d.metodoPago,
@@ -74,7 +77,6 @@ export default function ChatDetailPage() {
           ...d
         })
       } else {
-        // Fallback to chat info if client doesn't exist yet
         const chatRef = doc(db, 'chats', jid)
         getDoc(chatRef).then(chatSnap => {
           if (chatSnap.exists()) {
@@ -84,7 +86,20 @@ export default function ChatDetailPage() {
       }
     })
 
-    // Load messages in real-time
+    const chatRef = doc(db, 'chats', jid)
+    const unsubChat = onSnapshot(chatRef, (snap) => {
+      if (snap.exists()) {
+        const d = snap.data()
+        const humano = d.humanoAtendiendo === true
+        const silenciadoHasta = d.silenciadoHasta?.toDate?.() ?? null
+        const silenciadoPorTiempo = silenciadoHasta ? silenciadoHasta.getTime() > Date.now() : false
+        setBotSilenciado(humano || silenciadoPorTiempo)
+        if (!humano && !silenciadoPorTiempo) {
+          setAsistenciaSolicitada(false)
+        }
+      }
+    })
+
     const mensajesRef = collection(db, 'chats', jid, 'mensajes')
     const q = query(mensajesRef, orderBy('timestamp', 'asc'))
     const unsubMensajes = onSnapshot(q, (snap) => {
@@ -105,27 +120,42 @@ export default function ChatDetailPage() {
 
     return () => {
       unsubCliente()
+      unsubChat()
       unsubMensajes()
     }
   }, [jid])
 
-  async function toggleBotSilencio() {
-    if (!chatInfo) return
+  const silenciarBot = useCallback(async () => {
     setToggling(true)
     try {
       const chatRef = doc(db, 'chats', jid)
-      await updateDoc(chatRef, {
-        humanoAtendiendo: !chatInfo.humanoAtendiendo,
-        silenciadoHasta: !chatInfo.humanoAtendiendo
-          ? Timestamp.fromDate(new Date(Date.now() + 24 * 60 * 60 * 1000))
-          : null,
-      })
+      await setDoc(chatRef, {
+        humanoAtendiendo: true,
+        silenciadoHasta: Timestamp.fromDate(new Date(Date.now() + 24 * 60 * 60 * 1000)),
+      }, { merge: true })
     } catch (err) {
       console.error(err)
     } finally {
       setToggling(false)
     }
-  }
+  }, [jid])
+
+  const solicitarAsistenciaVicky = useCallback(async () => {
+    setSolicitando(true)
+    try {
+      const chatRef = doc(db, 'chats', jid)
+      await setDoc(chatRef, {
+        humanoAtendiendo: false,
+        humanoAtendiendoAt: deleteField(),
+        silenciadoHasta: deleteField(),
+      }, { merge: true })
+      setAsistenciaSolicitada(true)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setSolicitando(false)
+    }
+  }, [jid])
 
   async function handleFeedback(msgId: string, feedback: 'good' | 'bad') {
     try {
@@ -182,9 +212,14 @@ export default function ChatDetailPage() {
             <h2 className="font-semibold text-slate-900">
               {chatInfo?.nombre || chatInfo?.tel || 'Cliente'}
             </h2>
-            {chatInfo?.humanoAtendiendo && (
+            {botSilenciado && (
               <span className="badge bg-orange-100 text-orange-700 text-xs">
                 <User className="w-3 h-3 mr-1" /> Humano atendiendo
+              </span>
+            )}
+            {!botSilenciado && asistenciaSolicitada && (
+              <span className="badge bg-green-100 text-green-700 text-xs">
+                <Bot className="w-3 h-3 mr-1" /> Vicky activa
               </span>
             )}
             {chatInfo?.estado && (
@@ -209,22 +244,25 @@ export default function ChatDetailPage() {
             <span className="hidden sm:inline">Abrir WA</span>
           </a>
 
-          <button
-            onClick={toggleBotSilencio}
-            disabled={toggling}
-            className={cn(
-              'flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
-              chatInfo?.humanoAtendiendo
-                ? 'bg-green-50 text-green-700 hover:bg-green-100 border border-green-200'
-                : 'bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-200'
-            )}
-          >
-            {chatInfo?.humanoAtendiendo ? (
-              <><Bell className="w-4 h-4" /> <span className="hidden sm:inline">Reactivar bot</span></>
-            ) : (
-              <><BellOff className="w-4 h-4" /> <span className="hidden sm:inline">Silenciar bot</span></>
-            )}
-          </button>
+          {botSilenciado ? (
+            <button
+              onClick={solicitarAsistenciaVicky}
+              disabled={solicitando}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors bg-brand-50 text-brand-700 hover:bg-brand-100 border border-brand-200"
+            >
+              <HandHelping className="w-4 h-4" />
+              <span className="hidden sm:inline">Pedir asistencia Vicky</span>
+            </button>
+          ) : (
+            <button
+              onClick={silenciarBot}
+              disabled={toggling}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-200"
+            >
+              <BellOff className="w-4 h-4" />
+              <span className="hidden sm:inline">Silenciar bot</span>
+            </button>
+          )}
 
           <div className="w-px h-6 bg-slate-200 mx-1" />
 
@@ -338,6 +376,45 @@ export default function ChatDetailPage() {
         )}
         <div ref={bottomRef} />
       </div>
+
+      {/* Banner de asistencia */}
+      {botSilenciado && (
+        <div className="bg-amber-50 border-t border-amber-200 px-4 sm:px-8 py-3 flex-shrink-0">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                <User className="w-4 h-4 text-amber-600" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-amber-800">Vicky en silencio</p>
+                <p className="text-xs text-amber-600 truncate">El humano está atendiendo este chat</p>
+              </div>
+            </div>
+            <button
+              onClick={solicitarAsistenciaVicky}
+              disabled={solicitando}
+              className="flex items-center gap-2 px-4 py-2.5 bg-brand-600 text-white rounded-xl text-sm font-semibold hover:bg-brand-700 transition-colors shadow-sm flex-shrink-0 disabled:opacity-50"
+            >
+              <Bot className="w-4 h-4" />
+              Solicitar asistencia de Vicky
+            </button>
+          </div>
+          <p className="text-[11px] text-amber-500 mt-1.5 ml-10">
+            Vicky responderá al próximo mensaje del cliente. Si respondés desde el teléfono, se silenciará automáticamente.
+          </p>
+        </div>
+      )}
+
+      {!botSilenciado && asistenciaSolicitada && (
+        <div className="bg-green-50 border-t border-green-200 px-4 sm:px-8 py-2.5 flex-shrink-0">
+          <div className="flex items-center gap-2">
+            <Bot className="w-4 h-4 text-green-600" />
+            <p className="text-sm text-green-700 font-medium">
+              Vicky está lista para responder al próximo mensaje del cliente
+            </p>
+          </div>
+        </div>
+      )}
 
       <LeadDrawer
         isOpen={isDrawerOpen}
