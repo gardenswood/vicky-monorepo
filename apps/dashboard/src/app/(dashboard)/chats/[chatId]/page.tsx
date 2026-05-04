@@ -42,6 +42,7 @@ interface Mensaje {
   marcadores?: string[]
   servicio?: string
   feedback?: 'good' | 'bad'
+  origen?: 'humano' | string
 }
 
 export default function ChatDetailPage() {
@@ -112,6 +113,7 @@ export default function ChatDetailPage() {
         marcadores: d.data().marcadores,
         servicio: d.data().servicio,
         feedback: d.data().feedback,
+        origen: d.data().origen,
       }))
       setMensajes(data)
       setLoading(false)
@@ -298,7 +300,9 @@ export default function ChatDetailPage() {
                 </span>
               </div>
 
-              {group.messages.map((msg) => (
+              {group.messages.map((msg) => {
+                const esHumano = msg.direccion === 'saliente' && msg.origen === 'humano'
+                return (
                 <div
                   key={msg.id}
                   className={cn('flex animate-in', msg.direccion === 'saliente' ? 'justify-end' : 'justify-start')}
@@ -314,15 +318,26 @@ export default function ChatDetailPage() {
                     )}
                     {msg.direccion === 'saliente' && (
                       <div className="flex items-center gap-1 mb-1 mr-1 justify-end">
-                        <Bot className="w-3 h-3 text-brand-600" />
-                        <span className="text-xs text-brand-600 font-medium">Vicky</span>
+                        {esHumano ? (
+                          <>
+                            <User className="w-3 h-3 text-orange-600" />
+                            <span className="text-xs text-orange-600 font-medium">Operador</span>
+                          </>
+                        ) : (
+                          <>
+                            <Bot className="w-3 h-3 text-brand-600" />
+                            <span className="text-xs text-brand-600 font-medium">Vicky</span>
+                          </>
+                        )}
                       </div>
                     )}
                     <div className={cn(
                       'px-4 py-2.5 rounded-2xl shadow-sm relative',
-                      msg.direccion === 'saliente' 
-                        ? 'bg-[#d9fdd3] text-slate-800 rounded-tr-sm' 
-                        : 'bg-white text-slate-800 rounded-tl-sm'
+                      msg.direccion === 'saliente' && esHumano
+                        ? 'bg-orange-50 text-slate-800 rounded-tr-sm border border-orange-200'
+                        : msg.direccion === 'saliente'
+                          ? 'bg-[#d9fdd3] text-slate-800 rounded-tr-sm' 
+                          : 'bg-white text-slate-800 rounded-tl-sm'
                     )}>
                       {msg.tipo !== 'texto' && (
                         <div className="flex items-center gap-1.5 mb-1 opacity-70 text-xs font-medium">
@@ -376,7 +391,7 @@ export default function ChatDetailPage() {
                     )}
                   </div>
                 </div>
-              ))}
+              )})}
             </div>
           ))
         )}

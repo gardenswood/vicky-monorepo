@@ -42,6 +42,7 @@ interface Mensaje {
   marcadores?: string[]
   servicio?: string
   feedback?: 'good' | 'bad'
+  origen?: 'humano' | string
 }
 
 interface ChatInfo {
@@ -112,6 +113,7 @@ export default function ChatModal({ jidDecoded, onClose }: ChatModalProps) {
         marcadores: d.data().marcadores,
         servicio: d.data().servicio,
         feedback: d.data().feedback,
+        origen: d.data().origen,
       }))
       setMensajes(data)
       setLoading(false)
@@ -298,7 +300,9 @@ export default function ChatModal({ jidDecoded, onClose }: ChatModalProps) {
                     </span>
                   </div>
 
-                  {group.messages.map((msg) => (
+                  {group.messages.map((msg) => {
+                    const esHumano = msg.direccion === 'saliente' && msg.origen === 'humano'
+                    return (
                     <div
                       key={msg.id}
                       className={cn('flex animate-in slide-in-from-bottom-2', msg.direccion === 'saliente' ? 'justify-end' : 'justify-start')}
@@ -314,12 +318,25 @@ export default function ChatModal({ jidDecoded, onClose }: ChatModalProps) {
                         )}
                         {msg.direccion === 'saliente' && (
                           <div className="flex items-center gap-1.5 mb-1 mr-2 justify-end">
-                            <span className="text-xs text-brand-600 font-medium">Vicky</span>
-                            <Bot className="w-3.5 h-3.5 text-brand-600" />
+                            {esHumano ? (
+                              <>
+                                <span className="text-xs text-orange-600 font-medium">Operador</span>
+                                <User className="w-3.5 h-3.5 text-orange-600" />
+                              </>
+                            ) : (
+                              <>
+                                <span className="text-xs text-brand-600 font-medium">Vicky</span>
+                                <Bot className="w-3.5 h-3.5 text-brand-600" />
+                              </>
+                            )}
                           </div>
                         )}
                         <div className={cn(
-                          msg.direccion === 'saliente' ? 'bubble-out bg-brand-600 text-white rounded-2xl rounded-tr-sm p-3 shadow-sm' : 'bubble-in bg-white border border-slate-200 text-slate-800 rounded-2xl rounded-tl-sm p-3 shadow-sm'
+                          msg.direccion === 'saliente' && esHumano
+                            ? 'bg-orange-50 text-slate-800 border border-orange-200 rounded-2xl rounded-tr-sm p-3 shadow-sm'
+                            : msg.direccion === 'saliente'
+                              ? 'bubble-out bg-brand-600 text-white rounded-2xl rounded-tr-sm p-3 shadow-sm'
+                              : 'bubble-in bg-white border border-slate-200 text-slate-800 rounded-2xl rounded-tl-sm p-3 shadow-sm'
                         )}>
                           {msg.tipo !== 'texto' && (
                             <div className="flex items-center gap-1.5 mb-2 opacity-80 text-xs font-medium bg-black/10 rounded-lg px-2 py-1 w-fit">
@@ -339,7 +356,7 @@ export default function ChatModal({ jidDecoded, onClose }: ChatModalProps) {
                           )}
                           <p className={cn(
                             'text-[11px] mt-2 font-medium',
-                            msg.direccion === 'saliente' ? 'text-white/70 text-right' : 'text-slate-400'
+                            msg.direccion === 'saliente' && !esHumano ? 'text-white/70 text-right' : 'text-slate-400 text-right'
                           )}>
                             {format(msg.timestamp, 'HH:mm')}
                           </p>
@@ -374,7 +391,7 @@ export default function ChatModal({ jidDecoded, onClose }: ChatModalProps) {
                         )}
                       </div>
                     </div>
-                  ))}
+                  )})}
                 </div>
               ))
             )}

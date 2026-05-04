@@ -8496,11 +8496,44 @@ Ejemplos de cómo traducir instrucciones:
                     session.humanAtendiendo = true;
                     session.humanTimestamp = Date.now();
                     console.log(`👤 Humano respondió en ${remoteJid}. Bot silenciado 24hs.`);
+
                     if (firestoreModule.isAvailable()) {
                         try {
                             await firestoreModule.setHumanoAtendiendo(remoteJid, true);
                         } catch (e) {
                             console.warn('⚠️ setHumanoAtendiendo:', e.message);
+                        }
+
+                        const innerHum = mensajeInnerPlano(msg) || msg.message;
+                        const textoHumano = (
+                            innerHum?.conversation
+                            || innerHum?.extendedTextMessage?.text
+                            || innerHum?.imageMessage?.caption
+                            || innerHum?.videoMessage?.caption
+                            || innerHum?.documentMessage?.caption
+                            || ''
+                        ).trim();
+                        const tipoHumano = innerHum?.imageMessage ? 'imagen'
+                            : innerHum?.audioMessage ? 'audio'
+                            : innerHum?.videoMessage ? 'video'
+                            : innerHum?.documentMessage ? 'documento'
+                            : 'texto';
+                        if (textoHumano || tipoHumano !== 'texto') {
+                            const histCl = getCliente(remoteJid);
+                            firestoreModule.logMensaje({
+                                jid: remoteJid,
+                                tipo: tipoHumano,
+                                contenido: textoHumano || `[${tipoHumano}]`,
+                                direccion: 'saliente',
+                                origen: 'humano',
+                                servicio: histCl?.servicioPendiente || null,
+                                clienteInfo: {
+                                    nombre: histCl?.nombre,
+                                    estado: histCl?.estado,
+                                    servicioPendiente: histCl?.servicioPendiente,
+                                    humanoAtendiendo: true,
+                                },
+                            }).catch(() => {});
                         }
                     }
                 }

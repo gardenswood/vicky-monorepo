@@ -38,25 +38,26 @@ async function initFirestore() {
  * Colección: chats/{jid}/mensajes/{id}
  * También actualiza el doc padre chats/{jid} con metadata del último mensaje.
  */
-async function logMensaje({ jid, tipo, contenido, direccion, marcadores, servicio, clienteInfo }) {
+async function logMensaje({ jid, tipo, contenido, direccion, marcadores, servicio, clienteInfo, origen }) {
     if (!firestoreDb) return;
     try {
         const admin = require('firebase-admin');
         const FieldValue = admin.firestore.FieldValue;
         const timestamp = FieldValue.serverTimestamp();
 
-        // Registrar el mensaje individual
         const mensajeRef = firestoreDb
             .collection('chats').doc(jid)
             .collection('mensajes').doc();
-        await mensajeRef.set({
-            contenido: contenido?.slice(0, 2000) || '', // limitar tamaño
+        const msgData = {
+            contenido: contenido?.slice(0, 2000) || '',
             tipo: tipo || 'texto',
             direccion: direccion || 'entrante',
             timestamp,
             marcadores: marcadores || [],
             servicio: servicio || null,
-        });
+        };
+        if (origen) msgData.origen = origen;
+        await mensajeRef.set(msgData);
 
         // Actualizar doc padre del chat con último mensaje y metadata del cliente
         const telLegible = String(jid || '').startsWith('ig:')
