@@ -394,6 +394,120 @@ const server = http.createServer((req, res) => {
         });
     }
 
+    if (req.method === 'POST' && urlPathOnly === '/internal/asistencia-vicky') {
+        let raw = '';
+        req.on('data', (c) => { raw += c; });
+        return req.on('end', async () => {
+            const secretConfigured = vickyCronSecretTrimmed();
+            const authed = isCronRequestAuthorized(req) || cronJsonBodyMatchesSecret(raw);
+            if (!secretConfigured || !authed) {
+                logCronAuth401(req, urlPathOnly, {
+                    bodySecretTried: process.env.VICKY_CRON_ALLOW_BODY_SECRET === '1',
+                });
+                return send(401, 'unauthorized');
+            }
+            try {
+                let body = {};
+                try { body = JSON.parse(raw); } catch (_) {}
+                const jid = body.jid;
+                if (!jid) return send(400, JSON.stringify({ ok: false, error: 'falta jid' }), 'application/json; charset=utf-8');
+
+                // 1. Limpiar silencio
+                if (firestoreModule.isAvailable()) {
+                    await firestoreModule.reactivarBotEnChat(jid);
+                }
+                const sess = SESSIONS.get(jid);
+                if (sess) {
+                    sess.humanAtendiendo = false;
+                    sess.humanTimestamp = null;
+                }
+
+                // 2. Leer últimos mensajes y encontrar el último del cliente sin respuesta bot
+                const items = firestoreModule.isAvailable()
+                    ? await firestoreModule.getUltimosMensajesChatItems(jid, 15)
+                    : [];
+                if (!items.length) {
+                    return send(200, JSON.stringify({ ok: true, responded: false, reason: 'no_messages' }), 'application/json; charset=utf-8');
+                }
+
+                let lastClientText = null;
+                for (const m of items) {
+                    if (m.direccion === 'entrante' && m.contenido) {
+                        lastClientText = m.contenido;
+                        break;
+                    }
+                    if (m.direccion === 'saliente') break;
+                }
+
+                if (!lastClientText) {
+                    return send(200, JSON.stringify({ ok: true, responded: false, reason: 'no_pending_client_msg' }), 'application/json; charset=utf-8');
+                }
+
+                // 3. Asegurar sesión
+                const telCliente = getTel(jid);
+                if (!SESSIONS.has(jid)) {
+                    await downloadHistorialConsultaIfNeeded(telCliente);
+                    const histCliente = getCliente(jid);
+                    const chatHistory = [];
+                    const contextoPrevio = construirContextoPrevio(histCliente);
+                    if (contextoPrevio) {
+                        chatHistory.push(
+                            { role: 'user', parts: [{ text: contextoPrevio }] },
+                            { role: 'model', parts: [{ text: 'Entendido, tengo el contexto del cliente.' }] }
+                        );
+                    }
+                    const consultasData = leerHistorialConsultasArchivo(telCliente);
+                    const ctxConsultas = construirContextoHistorialConsultas(consultasData);
+                    if (ctxConsultas) {
+                        chatHistory.push(
+                            { role: 'user', parts: [{ text: ctxConsultas }] },
+                            { role: 'model', parts: [{ text: 'Entendido, tengo el historial de consultas de este contacto.' }] }
+                        );
+                    }
+                    const ultPersistido = histCliente?.ultimoMensaje;
+                    SESSIONS.set(jid, {
+                        audioIntroEnviado: true,
+                        humanAtendiendo: false,
+                        humanTimestamp: null,
+                        chatHistory,
+                        imagenEnviada: {},
+                        ultimoMensajeCliente: (typeof ultPersistido === 'number' && ultPersistido > 0) ? ultPersistido : null,
+                        mensajesTexto: 0,
+                    });
+                }
+
+                const session = SESSIONS.get(jid);
+                session.humanAtendiendo = false;
+                session.humanTimestamp = null;
+
+                // 4. Llamar pipeline Gemini
+                console.log(`🤝 Asistencia Vicky solicitada para ${jid}: "${lastClientText.slice(0, 80)}"`);
+                await ejecutarTurnoVickyGeminiCore(vickyGeminiTurnDeps, {
+                    canal: 'whatsapp',
+                    remoteJid: jid,
+                    instagramPsid: null,
+                    session,
+                    telCliente,
+                    text: lastClientText,
+                    tieneImagen: false,
+                    tieneAudio: false,
+                    imagenBase64: null,
+                    imagenMime: 'image/jpeg',
+                    audioClienteBase64: null,
+                    audioClienteMime: 'audio/ogg',
+                    primerContacto: false,
+                    minutosDesdeUltimoMensaje: 0,
+                    publicidadLead: null,
+                });
+
+                send(200, JSON.stringify({ ok: true, responded: true, jid }), 'application/json; charset=utf-8');
+            } catch (e) {
+                console.error('❌ asistencia-vicky:', e);
+                send(500, JSON.stringify({ ok: false, error: e.message }), 'application/json; charset=utf-8');
+            }
+        });
+    }
+
     if (
         req.method === 'GET' &&
         (urlPathOnly === '/internal/cron/programados' ||

@@ -149,6 +149,12 @@ export default function ChatModal({ jidDecoded, onClose }: ChatModalProps) {
         silenciadoHasta: deleteField(),
       }, { merge: true })
       setAsistenciaSolicitada(true)
+
+      fetch('/api/solicitar-asistencia', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jid: jidDecoded }),
+      }).catch(() => {})
     } catch (err) {
       console.error(err)
     } finally {
