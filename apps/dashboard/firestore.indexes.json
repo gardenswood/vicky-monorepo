@@ -39,6 +39,14 @@
         { "fieldPath": "estado", "order": "ASCENDING" },
         { "fieldPath": "fechaPedido", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "entregas_agenda",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "fechaDia", "order": "ASCENDING" },
+        { "fieldPath": "estado", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

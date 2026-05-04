@@ -300,6 +300,29 @@ const server = http.createServer((req, res) => {
         });
     }
 
+    if (req.method === 'POST' && urlPathOnly === '/internal/cron/digest-entregas') {
+        let raw = '';
+        req.on('data', (c) => { raw += c; });
+        return req.on('end', async () => {
+            const secretConfigured = vickyCronSecretTrimmed();
+            const authed =
+                isCronRequestAuthorized(req) || cronJsonBodyMatchesSecret(raw);
+            if (!secretConfigured || !authed) {
+                logCronAuth401(req, urlPathOnly, {
+                    bodySecretTried: process.env.VICKY_CRON_ALLOW_BODY_SECRET === '1',
+                });
+                return send(401, 'unauthorized');
+            }
+            try {
+                const fn = vickyCronHandlers.ejecutarDigestEntregas;
+                const r = fn ? await fn() : { skipped: true };
+                send(200, JSON.stringify({ ok: true, ...r }), 'application/json; charset=utf-8');
+            } catch (e) {
+                send(500, JSON.stringify({ ok: false, error: e.message }), 'application/json; charset=utf-8');
+            }
+        });
+    }
+
     if (req.method === 'POST' && urlPathOnly === '/internal/cron/geocode-clientes') {
         let raw = '';
         req.on('data', (c) => { raw += c; });
@@ -376,6 +399,7 @@ const server = http.createServer((req, res) => {
         (urlPathOnly === '/internal/cron/programados' ||
             urlPathOnly === '/internal/cron/weather' ||
             urlPathOnly === '/internal/cron/geocode-clientes' ||
+            urlPathOnly === '/internal/cron/digest-entregas' ||
             urlPathOnly === '/internal/reload/runtime')
     ) {
         return send(
@@ -886,7 +910,7 @@ T7. SIN VISITA TÉCNICA A DOMICILIO (no ofrecer): **No** propongas ni ofrezcas v
     Si en un mismo mensaje da varios datos, podés emitir varios marcadores. Si ya usás [ZONA:…] para el mismo concepto, no dupliques; priorizá el más específico.
 21. Cuando el cliente te diga su método de pago preferido (efectivo o transferencia), agregá al FINAL: [METODO_PAGO:efectivo] o [METODO_PAGO:transferencia]
 21b. Cuando en UN SOLO mensaje el cliente te envíe los datos que pediste para coordinar entrega u obra (como mínimo: un TELÉFONO DE CONTACTO real —puede ser distinto al de WhatsApp—, más DIRECCIÓN o ZONA clara, más FRANJA HORARIA / horario preferido de entrega u otro dato de coordinación equivalente), al FINAL de tu respuesta agregá EXACTAMENTE esta marca sola: [NOTIFICAR_DATOS_ENTREGA]. No la uses si faltan datos, si el mensaje es solo una pregunta o si el cliente aún no cerró los datos. Seguí usando en el mismo turno [DIRECCION:…], [ZONA:…], [BARRIO:…], [LOCALIDAD:…], [REFERENCIA:…], [NOTAS_UBICACION:…], [NOMBRE:…], etc. cuando correspondan.
-21c. Si en ese mismo intercambio el cliente ya dio o confirmó una FECHA concreta de entrega (día del mes, “el viernes” resuelto a fecha, etc.), agregá también [ENTREGA:YYYY-MM-DD|HH:mm o --|título breve con nombre o producto]. Si todavía no hay día cerrado, no inventes la fecha. El sistema guarda el evento en el cronograma del panel y los datos en CRM.
+21c. AGENDAR ENTREGA CON FECHA: Cuando el cliente confirma un pedido Y da o confirma una FECHA concreta de entrega (día del mes, "el viernes" resuelto a fecha, "mañana", etc.), emití SIEMPRE al FINAL: [ENTREGA:YYYY-MM-DD|HH:mm o --|título breve con nombre, producto y kg]. Resolvé fechas relativas ("el viernes", "la semana que viene") a la fecha real YYYY-MM-DD usando la fecha de hoy del [CONTEXTO_SISTEMA]. Si hay hora pactada usá HH:mm; si solo hay día usá --. No esperes al modo cierre-entrega para usar este marcador: si tenés fecha confirmada en conversación normal, emitilo. Si todavía no hay día cerrado, no inventes la fecha. Este marcador agenda la entrega en el calendario del panel, notifica automáticamente al encargado de reparto y programa recordatorios al cliente.
 22. Cuando el cliente confirme un pedido o una obra y ya tenés todos los datos, registrá el pedido al FINAL con: [PEDIDO:servicio|descripcion_breve] — por ejemplo: [PEDIDO:lena|500kg quebracho] o [PEDIDO:cerco|12m a 2m de alto]
 25. AUDIOS QUE MANDA EL CLIENTE: Cuando el cliente manda un audio o nota de voz, procesá su contenido normalmente. Además, al principio de tu respuesta incluí esta línea especial (y solo esta línea al inicio): [AUDIO_CORTO:frase]
     REGLAS DE ORO para el AUDIO_CORTO — para que suene LO MÁS HUMANA POSIBLE:
@@ -5725,9 +5749,45 @@ async function ejecutarCronClima() {
     });
 }
 
+async function ejecutarCronDigestEntregas() {
+    if (!firestoreModule.isAvailable()) return { skipped: true, reason: 'no_firestore' };
+    const jidJuan = jidOperacionDatosEntrega();
+    if (!jidJuan) return { skipped: true, reason: 'no_datos_entrega_phone' };
+
+    const ahora = new Date(Date.now() - 3 * 60 * 60 * 1000);
+    const hoyStr = `${ahora.getUTCFullYear()}-${String(ahora.getUTCMonth() + 1).padStart(2, '0')}-${String(ahora.getUTCDate()).padStart(2, '0')}`;
+
+    const entregas = await firestoreModule.getEntregasAgendaPorFecha(hoyStr);
+    if (!entregas || entregas.length === 0) return { ok: true, entregas: 0, hoy: hoyStr };
+
+    const lineas = entregas.map((e, i) => {
+        const hora = e.horaTexto || '--';
+        const titulo = e.titulo || 'Entrega';
+        const dir = e.direccion || 'sin dirección';
+        const tel = e.telefonoContacto || '';
+        const kg = e.kg ? `${e.kg}kg` : '';
+        const parts = [hora, titulo, dir, kg, tel ? `Tel: ${tel}` : ''].filter(Boolean);
+        return `${i + 1}. ${parts.join(' — ')}`;
+    });
+
+    const texto = `Buenos días! Hoy tenés *${entregas.length}* entrega(s) programada(s):\n\n`
+        + lineas.join('\n')
+        + '\n\nBuen día de reparto! 🚚';
+
+    try {
+        await sendBotMessage(jidJuan, { text: texto });
+    } catch (e) {
+        console.warn('⚠️ digest entregas envío:', e?.message || e);
+        return { ok: false, error: e.message };
+    }
+
+    return { ok: true, entregas: entregas.length, hoy: hoyStr };
+}
+
 vickyCronHandlers.ejecutarProgramados = ejecutarCronProgramados;
 vickyCronHandlers.ejecutarClima = ejecutarCronClima;
 vickyCronHandlers.ejecutarGeocodeClientes = ejecutarCronGeocodificacionClientes;
+vickyCronHandlers.ejecutarDigestEntregas = ejecutarCronDigestEntregas;
 
 /** Tras aplicar instructivo en Firestore (#g + OK): mismo armado que en bootstrap (prompt + sufijo servicios). */
 async function recargarVickyGeminiSystemPrompt() {

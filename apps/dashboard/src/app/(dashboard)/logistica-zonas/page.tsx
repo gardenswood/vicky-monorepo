@@ -407,9 +407,13 @@ export default function LogisticaZonasPage() {
     <div className="p-8">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Consultas de leña por zona</h1>
+          <h1 className="text-2xl font-bold text-slate-900">Consultas por zona</h1>
           <p className="text-slate-500 text-sm mt-0.5">
-            Consultas manuales pendientes agrupadas por zona. Umbral actual: {config.umbralKg} kg.
+            Interés pendiente de clientes agrupado por zona. Al alcanzar el umbral ({config.umbralKg} kg), se puede armar reparto.
+            Para entregas con fecha, usá{' '}
+            <Link href="/agenda-entregas" className="text-brand-600 hover:text-brand-700 font-medium">
+              Agenda de entregas
+            </Link>.
           </p>
         </div>
         <button onClick={() => openNewForm()} className="btn-primary flex items-center gap-1.5">

@@ -52,12 +52,12 @@ const navItems = [
     icon: CalendarClock,
   },
   {
-    label: 'Leña & Logística',
+    label: 'Reparto de leña',
     icon: Truck,
     children: [
-      { label: 'Cola de leña', href: '/cola-lena', icon: Truck },
-      { label: 'Zonas & Consultas', href: '/logistica-zonas', icon: MapPin },
       { label: 'Agenda de entregas', href: '/agenda-entregas', icon: Calendar },
+      { label: 'Cola de reparto', href: '/cola-lena', icon: Truck },
+      { label: 'Consultas por zona', href: '/logistica-zonas', icon: MapPin },
     ],
   },
   {

@@ -67,15 +67,14 @@ type EntregaDoc = {
   titulo: string
   notas?: string | null
   jid?: string | null
-  /** Teléfono de contacto en puerta (puede diferir del WhatsApp) */
   telefonoContacto?: string | null
-  /** Dirección de entrega (copia operativa del día; el CRM sigue en clientes/) */
   direccion?: string | null
-  /** Producto y características a entregar */
   producto?: string | null
   kg?: number | null
   origen?: string
   estado?: string
+  juanNotificadoAt?: Timestamp | null
+  recordatorioClienteDocId?: string | null
 }
 
 type ProgramadoDoc = {
@@ -140,6 +139,10 @@ export default function AgendaEntregasPage() {
   const [importingCrm, setImportingCrm] = useState(false)
   const [datosEntregaReg, setDatosEntregaReg] = useState<DatosEntregaRegDoc[]>([])
   const [agendaFirestoreError, setAgendaFirestoreError] = useState<string | null>(null)
+  const [notifyJuan, setNotifyJuan] = useState(true)
+  const [scheduleClientReminder, setScheduleClientReminder] = useState(true)
+  const [datosEntregaPhone, setDatosEntregaPhone] = useState('')
+  const [datosEntregaExpanded, setDatosEntregaExpanded] = useState(false)
 
   const monthStart = startOfMonth(cursor)
   const monthEnd = endOfMonth(cursor)
@@ -195,11 +198,17 @@ export default function AgendaEntregasPage() {
       )
     })
 
+    const unsubCfg = onSnapshot(doc(db, 'config', 'general'), (snap) => {
+      const d = snap.data()
+      setDatosEntregaPhone(String(d?.datosEntregaNotifyPhone ?? '').replace(/\D/g, ''))
+    })
+
     return () => {
       unsubE()
       unsubP()
       unsubC()
       unsubDe()
+      unsubCfg()
     }
   }, [cursor, fechaMin, fechaMax, monthStart, monthEnd])
 
@@ -372,14 +381,52 @@ export default function AgendaEntregasPage() {
       if (editingId) {
         await updateDoc(doc(db, 'entregas_agenda', editingId), campos)
       } else {
-        await addDoc(collection(db, 'entregas_agenda'), {
+        const entregaRef = await addDoc(collection(db, 'entregas_agenda'), {
           ...campos,
           origen: 'panel',
           estado: 'pendiente',
           creadoEn: serverTimestamp(),
-          /** El bot marca true tras enviar el aviso al grupo WA (panel General). */
           notificadoGrupoAgenda: false,
+          juanNotificadoAt: notifyJuan && datosEntregaPhone ? serverTimestamp() : null,
         })
+
+        if (notifyJuan && datosEntregaPhone) {
+          const horaLabel = ht || 'sin hora definida'
+          const textoJuan = `📦 *Nueva entrega agendada*\n📅 ${form.fechaDia} — ${horaLabel}\n📦 ${tit}\n${dir ? `📍 ${dir}\n` : ''}${telC ? `📱 ${telC}\n` : ''}_Origen: Panel (agenda)_`
+          await addDoc(collection(db, 'mensajes_programados'), {
+            jid: `${datosEntregaPhone}@s.whatsapp.net`,
+            texto: textoJuan,
+            runAt: Timestamp.fromDate(new Date()),
+            estado: 'pendiente',
+            origen: 'dashboard_notif_entrega_juan',
+            creadoEn: serverTimestamp(),
+          })
+        }
+
+        if (scheduleClientReminder && form.jid.trim()) {
+          let runAtMs: number
+          if (ht && /^\d{1,2}:\d{2}$/.test(ht)) {
+            const [hh, mm] = ht.split(':').map(Number)
+            const reminderH = Math.max(hh - 2, 8)
+            runAtMs = Date.parse(`${form.fechaDia}T${String(reminderH).padStart(2, '0')}:${String(mm).padStart(2, '0')}:00-03:00`)
+          } else {
+            runAtMs = Date.parse(`${form.fechaDia}T10:00:00-03:00`)
+          }
+          if (Number.isFinite(runAtMs) && runAtMs > Date.now()) {
+            const textoCliente = `Hola! Te recuerdo que hoy estamos pasando con tu pedido${dir ? ` por ${dir}` : ''}. Cualquier novedad avisame. — Vicky, Gardens Wood 🪵`
+            const recRef = await addDoc(collection(db, 'mensajes_programados'), {
+              jid: form.jid.trim(),
+              texto: textoCliente,
+              runAt: Timestamp.fromMillis(runAtMs),
+              estado: 'pendiente',
+              origen: 'dashboard_recordatorio_entrega_cliente',
+              creadoEn: serverTimestamp(),
+            })
+            await updateDoc(doc(db, 'entregas_agenda', entregaRef.id), {
+              recordatorioClienteDocId: recRef.id,
+            })
+          }
+        }
       }
       cerrarModal()
     } catch (e) {
@@ -591,6 +638,26 @@ export default function AgendaEntregasPage() {
                           <ExternalLink className="w-3 h-3" /> Chat
                         </Link>
                       )}
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        {e.juanNotificadoAt ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-medium bg-green-100 text-green-800 rounded-full px-2 py-0.5">
+                            <CheckCircle2 className="w-3 h-3" /> Reparto notificado
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-medium bg-red-100 text-red-700 rounded-full px-2 py-0.5">
+                            <Bell className="w-3 h-3" /> Sin notificar reparto
+                          </span>
+                        )}
+                        {e.recordatorioClienteDocId ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-medium bg-blue-100 text-blue-800 rounded-full px-2 py-0.5">
+                            <Bell className="w-3 h-3" /> Recordatorio cliente
+                          </span>
+                        ) : e.estado === 'pendiente' ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-medium bg-amber-100 text-amber-700 rounded-full px-2 py-0.5">
+                            <Bell className="w-3 h-3" /> Sin recordatorio
+                          </span>
+                        ) : null}
+                      </div>
                     </div>
                     <div className="flex flex-col gap-1 shrink-0 items-end">
                       <button
@@ -701,12 +768,22 @@ export default function AgendaEntregasPage() {
       </div>
 
       <div className="card p-4 mt-6 max-w-6xl">
-        <h3 className="font-semibold text-slate-900 mb-1">Datos de entrega (registro bot)</h3>
-        <p className="text-xs text-slate-500 mb-3">
+        <button
+          type="button"
+          className="flex items-center gap-2 w-full text-left"
+          onClick={() => setDatosEntregaExpanded((v) => !v)}
+        >
+          <ChevronRight className={cn('w-4 h-4 text-slate-400 transition-transform', datosEntregaExpanded && 'rotate-90')} />
+          <h3 className="font-semibold text-slate-900">Datos de entrega (registro bot)</h3>
+          {datosEntregaReg.length > 0 && (
+            <span className="text-xs bg-slate-100 text-slate-600 rounded-full px-2 py-0.5">{datosEntregaReg.length}</span>
+          )}
+        </button>
+        {datosEntregaExpanded && (
+          <>
+        <p className="text-xs text-slate-500 mb-3 mt-2">
           Se guarda cuando el cliente manda teléfono + dirección + franja y el modelo usa{' '}
-          <code className="text-[11px]">[NOTIFICAR_DATOS_ENTREGA]</code> (o heurística). La ficha CRM queda en{' '}
-          <code className="text-[11px]">clientes/…</code>; el día en el calendario con{' '}
-          <code className="text-[11px]">[ENTREGA:…]</code> o evento manual arriba.
+          <code className="text-[11px]">[NOTIFICAR_DATOS_ENTREGA]</code> (o heurística).
         </p>
         {datosEntregaReg.length === 0 ? (
           <p className="text-sm text-slate-400">Sin registros recientes.</p>
@@ -737,6 +814,8 @@ export default function AgendaEntregasPage() {
               </li>
             ))}
           </ul>
+        )}
+          </>
         )}
       </div>
 
@@ -862,6 +941,35 @@ export default function AgendaEntregasPage() {
                   onChange={(e) => setForm((f) => ({ ...f, notas: e.target.value }))}
                 />
               </div>
+              {!editingId && (
+                <div className="rounded-lg border border-slate-200 bg-slate-50/80 p-3 space-y-2">
+                  <p className="text-xs font-semibold text-slate-600 uppercase">Notificaciones automáticas</p>
+                  <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={notifyJuan}
+                      onChange={(e) => setNotifyJuan(e.target.checked)}
+                      className="rounded border-slate-300"
+                    />
+                    Notificar a encargado de reparto (Juan)
+                    {!datosEntregaPhone && (
+                      <span className="text-[10px] text-red-500 ml-1">Sin tel. configurado</span>
+                    )}
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={scheduleClientReminder}
+                      onChange={(e) => setScheduleClientReminder(e.target.checked)}
+                      className="rounded border-slate-300"
+                    />
+                    Programar recordatorio al cliente
+                    {!form.jid.trim() && (
+                      <span className="text-[10px] text-amber-600 ml-1">Completá JID del chat</span>
+                    )}
+                  </label>
+                </div>
+              )}
             </div>
             <div className="flex flex-wrap justify-between gap-2 pt-2">
               <div className="flex flex-wrap gap-2">

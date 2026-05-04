@@ -51,6 +51,14 @@ interface ConfigGeneral {
   whatsappGrupoJidAgendaEntregas?: string
   /** Si es false, no se envían avisos al grupo aunque haya JID. */
   notificarAgendaEntregasGrupoActivo?: boolean
+  /** Si es false, no se notifica al encargado de reparto al crear entregas. */
+  recordatorioEntregaJuanActivo?: boolean
+  /** Si es false, no se programa recordatorio al cliente antes de la entrega. */
+  recordatorioEntregaClienteActivo?: boolean
+  /** Horas antes de la entrega para enviar recordatorio al cliente (default 2). */
+  recordatorioEntregaClienteHorasAntes?: number
+  /** Plantilla del recordatorio al cliente. Placeholders: {nombre}, {direccion}, {hora}, {producto}. */
+  plantillaRecordatorioCliente?: string
 }
 
 const DEFAULT_CONFIG: ConfigGeneral = {
@@ -77,6 +85,11 @@ const DEFAULT_CONFIG: ConfigGeneral = {
   geocodeCronMaxPorEjecucion: 30,
   whatsappGrupoJidAgendaEntregas: '',
   notificarAgendaEntregasGrupoActivo: true,
+  recordatorioEntregaJuanActivo: true,
+  recordatorioEntregaClienteActivo: true,
+  recordatorioEntregaClienteHorasAntes: 2,
+  plantillaRecordatorioCliente:
+    'Hola {nombre}! Te recuerdo que hoy estamos pasando con tu pedido{producto} por {direccion}. Cualquier novedad avisame. — Vicky, Gardens Wood',
 }
 
 const MODELOS_GEMINI = [
@@ -575,6 +588,66 @@ export default function ConfigGeneralPage() {
                   pegar el enlace completo de invitación: el bot lo resuelve a JID al enviar el aviso. Pulsá{' '}
                   <strong>Guardar</strong>. Variable en Cloud Run:{' '}
                   <code className="bg-slate-100 px-1 rounded">WHATSAPP_GRUPO_JID_AGENDA_ENTREGAS</code>.
+                </p>
+              </div>
+            </div>
+            <div className="col-span-2 rounded-lg border border-slate-200 bg-slate-50/80 p-4 space-y-3">
+              <p className="text-sm font-medium text-slate-900">Recordatorios automáticos de entregas</p>
+              <p className="text-xs text-slate-500">
+                Cuando Vicky agenda una entrega con fecha (marcador <code className="text-[11px] bg-slate-100 px-1 rounded">[ENTREGA:…]</code>),
+                puede notificar al encargado de reparto y programar un recordatorio al cliente.
+              </p>
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <span className="text-sm text-slate-700">Notificar al encargado de reparto</span>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="sr-only peer"
+                    checked={config.recordatorioEntregaJuanActivo !== false}
+                    onChange={(e) => update({ recordatorioEntregaJuanActivo: e.target.checked })}
+                  />
+                  <div
+                    className={`w-11 h-6 rounded-full transition-colors ${config.recordatorioEntregaJuanActivo !== false ? 'bg-brand-600' : 'bg-slate-300'} after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full`}
+                  />
+                </label>
+              </div>
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <span className="text-sm text-slate-700">Recordatorio al cliente antes de la entrega</span>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="sr-only peer"
+                    checked={config.recordatorioEntregaClienteActivo !== false}
+                    onChange={(e) => update({ recordatorioEntregaClienteActivo: e.target.checked })}
+                  />
+                  <div
+                    className={`w-11 h-6 rounded-full transition-colors ${config.recordatorioEntregaClienteActivo !== false ? 'bg-brand-600' : 'bg-slate-300'} after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full`}
+                  />
+                </label>
+              </div>
+              <div>
+                <label className="label">Horas antes de la entrega para recordar al cliente</label>
+                <input
+                  type="number"
+                  className="input w-24"
+                  min={1}
+                  max={24}
+                  value={config.recordatorioEntregaClienteHorasAntes ?? 2}
+                  onChange={(e) => update({ recordatorioEntregaClienteHorasAntes: parseInt(e.target.value, 10) || 2 })}
+                />
+              </div>
+              <div>
+                <label className="label">Plantilla de recordatorio al cliente</label>
+                <textarea
+                  className="input min-h-20 text-sm"
+                  value={config.plantillaRecordatorioCliente || ''}
+                  onChange={(e) => update({ plantillaRecordatorioCliente: e.target.value })}
+                />
+                <p className="text-xs text-slate-500 mt-1">
+                  Placeholders: <code className="bg-slate-100 px-1 rounded">{'{nombre}'}</code>,{' '}
+                  <code className="bg-slate-100 px-1 rounded">{'{direccion}'}</code>,{' '}
+                  <code className="bg-slate-100 px-1 rounded">{'{hora}'}</code>,{' '}
+                  <code className="bg-slate-100 px-1 rounded">{'{producto}'}</code>
                 </p>
               </div>
             </div>

@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { collection, query, orderBy, onSnapshot, doc, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import { Truck, Package, MapPin, Clock, CheckCircle2, AlertTriangle, Phone } from 'lucide-react'
+import { Truck, Package, MapPin, Clock, CheckCircle2, AlertTriangle, Phone, Calendar as CalendarIcon } from 'lucide-react'
 import { cn, formatRelative, getTelFromJid } from '@/lib/utils'
 
 interface PedidoLena {
@@ -72,15 +72,25 @@ export default function ColaLenaPage() {
     <div className="p-8">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Cola logística de leña</h1>
+          <h1 className="text-2xl font-bold text-slate-900">Cola de reparto</h1>
           <p className="text-slate-500 text-sm mt-0.5">
-            Pedidos de leña confirmados listos para despacho. Para consultas pendientes, usá{' '}
+            Pedidos chicos de leña (hasta 200kg) acumulando para despacho grupal. Para consultas pendientes, usá{' '}
             <Link href="/logistica-zonas" className="text-brand-600 hover:text-brand-700 font-medium">
-              Zonas & Consultas
+              Consultas por zona
             </Link>
             .
           </p>
         </div>
+      </div>
+      <div className="mb-5 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 flex items-center gap-2">
+        <CalendarIcon className="w-4 h-4 flex-shrink-0" />
+        <span>
+          Entregas con fecha fija (como pedidos grandes con día pactado) se gestionan en{' '}
+          <Link href="/agenda-entregas" className="font-medium text-brand-700 hover:text-brand-800 underline">
+            Agenda de entregas
+          </Link>
+          .
+        </span>
       </div>
 
       {/* Capacity bar */}
@@ -223,7 +233,16 @@ export default function ColaLenaPage() {
                       </a>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1 flex-wrap">
+                    {(pedido.estado === 'en_cola' || pedido.estado === 'notificado') && (
+                      <Link
+                        href={`/agenda-entregas`}
+                        className="text-xs bg-brand-50 text-brand-700 border border-brand-200 px-2 py-1 rounded hover:bg-brand-100 transition-colors flex items-center gap-1"
+                      >
+                        <CalendarIcon className="w-3 h-3" />
+                        Agendar entrega
+                      </Link>
+                    )}
                     {pedido.estado === 'en_cola' && (
                       <button
                         onClick={() => cambiarEstado(pedido.id, 'notificado')}

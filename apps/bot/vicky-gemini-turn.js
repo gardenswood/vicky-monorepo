@@ -871,6 +871,7 @@ async function ejecutarTurnoVickyGeminiCore(deps, params) {
                 const productoStr = productoParts.length ? productoParts.join(' — ') : null;
                 const notasParts = [cliEnt?.zona, cliEnt?.notasUbicacion].filter(Boolean);
                 const notasStr = notasParts.length ? notasParts.join(' · ') : null;
+                const dirEntrega = cliEnt?.direccion || null;
                 const idEntrega = await firestoreModule.addEntregaAgenda({
                     jid: remoteJid,
                     fechaDia,
@@ -880,11 +881,85 @@ async function ejecutarTurnoVickyGeminiCore(deps, params) {
                     kg: null,
                     origen: 'gemini_entrega',
                     telefonoContacto: telC,
-                    direccion: cliEnt?.direccion || null,
+                    direccion: dirEntrega,
                     producto: productoStr,
                 });
                 if (idEntrega && typeof firestoreModule.setCierreEntregaAsistido === 'function') {
                     await firestoreModule.setCierreEntregaAsistido(remoteJid, false);
+                }
+
+                // --- Notificar a Juan y programar recordatorios ---
+                if (idEntrega) {
+                    let cfgEntrega = {};
+                    try {
+                        if (typeof firestoreModule.getConfigGeneral === 'function') {
+                            cfgEntrega = await firestoreModule.getConfigGeneral() || {};
+                        }
+                    } catch (_) { /* defaults */ }
+
+                    const juanActivo = cfgEntrega.recordatorioEntregaJuanActivo !== false;
+                    const clienteActivo = cfgEntrega.recordatorioEntregaClienteActivo !== false;
+                    const horasAntes = Number(cfgEntrega.recordatorioEntregaClienteHorasAntes) || 2;
+
+                    const jidJuan = jidOperacionDatosEntrega();
+                    const nombreCli = cliEnt?.nombre || primerNombreClienteDesdeHistorial(cliEnt) || 'Cliente';
+                    const horaLabel = horaTexto || 'sin hora definida';
+                    const dirLabel = dirEntrega || 'sin dirección';
+
+                    if (juanActivo && jidJuan) {
+                        const textoJuan = `📦 *Nueva entrega agendada*\n`
+                            + `📅 ${fechaDia} — ${horaLabel}\n`
+                            + `👤 ${nombreCli}\n`
+                            + `📍 ${dirLabel}\n`
+                            + `📦 ${tituloEnt}\n`
+                            + (telC ? `📱 ${telC}\n` : '')
+                            + `_Origen: Vicky (conversación)_`;
+                        sendBotMessage(jidJuan, { text: textoJuan }).catch((e) =>
+                            console.warn('⚠️ notif Juan entrega:', e?.message || e)
+                        );
+                        if (typeof firestoreModule.updateEntregaAgendaField === 'function') {
+                            firestoreModule.updateEntregaAgendaField(idEntrega, 'juanNotificadoAt', new Date()).catch(() => {});
+                        }
+                    }
+
+                    if (clienteActivo) {
+                        try {
+                            let runAtMs;
+                            if (horaTexto && /^\d{1,2}:\d{2}$/.test(horaTexto)) {
+                                const [hh, mm] = horaTexto.split(':').map(Number);
+                                const reminderH = Math.max(hh - horasAntes, 8);
+                                runAtMs = Date.parse(`${fechaDia}T${String(reminderH).padStart(2, '0')}:${String(mm).padStart(2, '0')}:00-03:00`);
+                            } else {
+                                runAtMs = Date.parse(`${fechaDia}T10:00:00-03:00`);
+                            }
+                            if (Number.isFinite(runAtMs) && runAtMs > Date.now()) {
+                                const plantilla = String(cfgEntrega.plantillaRecordatorioCliente || '').trim();
+                                let textoCliente;
+                                if (plantilla) {
+                                    textoCliente = plantilla
+                                        .replace(/\{nombre\}/gi, nombreCli)
+                                        .replace(/\{direccion\}/gi, dirLabel)
+                                        .replace(/\{hora\}/gi, horaLabel)
+                                        .replace(/\{producto\}/gi, tituloEnt);
+                                } else {
+                                    textoCliente = `Hola ${nombreCli}! Te recuerdo que hoy estamos pasando con tu pedido de leña`
+                                        + (dirEntrega ? ` por ${dirEntrega}` : '')
+                                        + `. Cualquier novedad avisame. — Vicky, Gardens Wood 🪵`;
+                                }
+                                const recClienteId = await firestoreModule.addMensajeProgramado({
+                                    jid: remoteJid,
+                                    texto: textoCliente,
+                                    runAtMs,
+                                    origen: 'bot_recordatorio_entrega_cliente',
+                                });
+                                if (recClienteId && typeof firestoreModule.updateEntregaAgendaField === 'function') {
+                                    firestoreModule.updateEntregaAgendaField(idEntrega, 'recordatorioClienteDocId', recClienteId).catch(() => {});
+                                }
+                            }
+                        } catch (eRec) {
+                            console.warn('⚠️ recordatorio cliente entrega:', eRec?.message || eRec);
+                        }
+                    }
                 }
             }
             respuesta = respuesta.replace(/\[ENTREGA:[^\]]+\]/gi, '').trim();

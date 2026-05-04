@@ -309,6 +309,10 @@ async function getConfigGeneral(opts) {
         colaLenaNotificarClientesRutaArmada: true,
         /** Dígitos de un segundo WhatsApp (ej. Juan / logística) que recibe copia del mismo aviso de ruta que el admin. Vacío = no. */
         colaLenaTelefonoAvisoRutaCopia: '',
+        recordatorioEntregaJuanActivo: true,
+        recordatorioEntregaClienteActivo: true,
+        recordatorioEntregaClienteHorasAntes: 2,
+        plantillaRecordatorioCliente: '',
     };
 
     if (!firestoreDb) return DEFAULT_CONFIG;
@@ -2260,6 +2264,35 @@ async function addEntregaAgenda({
     }
 }
 
+async function updateEntregaAgendaField(docId, field, value) {
+    if (!firestoreDb || !docId || !field) return;
+    try {
+        const admin = require('firebase-admin');
+        const update = { [field]: value };
+        if (value instanceof Date) {
+            update[field] = admin.firestore.Timestamp.fromDate(value);
+        }
+        update.actualizadoEn = admin.firestore.FieldValue.serverTimestamp();
+        await firestoreDb.collection('entregas_agenda').doc(docId).update(update);
+    } catch (e) {
+        console.warn(`⚠️ updateEntregaAgendaField(${field}):`, e.message);
+    }
+}
+
+async function getEntregasAgendaPorFecha(fechaDia) {
+    if (!firestoreDb || !fechaDia) return [];
+    try {
+        const snap = await firestoreDb.collection('entregas_agenda')
+            .where('fechaDia', '==', fechaDia)
+            .where('estado', '==', 'pendiente')
+            .get();
+        return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    } catch (e) {
+        console.warn('⚠️ getEntregasAgendaPorFecha:', e.message);
+        return [];
+    }
+}
+
 /**
  * Transacción: marca como notificado solo si aún era false (una sola réplica envía).
  * @returns {Promise<boolean>}
@@ -2902,6 +2935,8 @@ module.exports = {
     marcarProgramadoEstado,
     addEntregaAgenda,
     updateEntregaAgendaEstado,
+    updateEntregaAgendaField,
+    getEntregasAgendaPorFecha,
     getTextoEntregaAgendaListaAdmin,
     setEntregaAgendaPostAddHook,
     claimEntregaAgendaNotificacionGrupo,

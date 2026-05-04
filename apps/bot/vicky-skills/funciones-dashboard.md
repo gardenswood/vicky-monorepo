@@ -24,7 +24,8 @@ Usar las funciones operativas del dashboard como herramientas de gestión comerc
 
 - Fuente: `entregas_agenda/{id}`.
 - Usos: registrar entregas con fecha concreta, hora, título, dirección, producto, kg, teléfono y JID.
-- Acción: usar `[ENTREGA:YYYY-MM-DD|HH:mm o --|título]` cuando haya entrega concreta.
+- Acción: usar `[ENTREGA:YYYY-MM-DD|HH:mm o --|título]` cuando haya entrega concreta con fecha.
+- Al crear una entrega, el sistema automáticamente notifica al encargado de reparto, programa un recordatorio al cliente (2hs antes o 10am) y la incluye en el digest matinal.
 - No confundir con recordatorios: `[AGENDAR:fecha|texto]` escribe en `mensajes_programados`.
 
 ### Mensajes programados
