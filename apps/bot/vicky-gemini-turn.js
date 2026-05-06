@@ -398,7 +398,7 @@ async function ejecutarTurnoVickyGeminiCore(deps, params) {
             const partes = [];
             partes.push({ inlineData: { data: audioClienteBase64, mimeType: audioClienteMime } });
             partes.push({
-                text: `${ctxTiempo}\n${ctxLead}\nEl cliente envió un mensaje de voz. Usalo solo para entender la consulta y responder como Vicky. PROHIBIDO mostrar transcripciones, resúmenes del audio, razonamiento interno, análisis interno o marcadores operativos al cliente. Respondé directo, natural y útil, sin decir "en el audio dijiste" ni copiar literalmente lo que escuchaste.`,
+                text: `${ctxTiempo}\n${ctxLead}\nEl cliente envió un mensaje de voz. Usalo solo para entender la consulta y responder como Vicky.\nREGLAS ABSOLUTAS PARA AUDIO:\n1. NUNCA repitas, parafrasees ni resumas lo que el cliente dijo en el audio.\n2. NUNCA empieces con "Me decís que...", "Según lo que dijiste...", "Entiendo que necesitás...", "Por lo que escucho..." ni ninguna variación.\n3. Respondé DIRECTO al tema como si el cliente te hubiera escrito un texto. Ejemplo correcto: "Sí, tenemos cercos de madera" (no "Me decís que necesitás cercos, sí tenemos...").\n4. NO muestres transcripciones, resúmenes del audio, razonamiento interno, análisis interno ni marcadores operativos al cliente.`,
             });
             contenidoMensaje = partes;
         } else if (imagenBase64) {

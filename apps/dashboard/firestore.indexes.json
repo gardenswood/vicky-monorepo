@@ -47,6 +47,22 @@
         { "fieldPath": "fechaDia", "order": "ASCENDING" },
         { "fieldPath": "estado", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "mensajes_programados",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "estado", "order": "ASCENDING" },
+        { "fieldPath": "runAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "borradores",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "estado", "order": "ASCENDING" },
+        { "fieldPath": "creadoEn", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

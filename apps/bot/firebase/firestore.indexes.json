@@ -1,6 +1,54 @@
 {
   "indexes": [
     {
+      "collectionGroup": "chats",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "estado", "order": "ASCENDING" },
+        { "fieldPath": "ultimoMensajeAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "clientes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "estado", "order": "ASCENDING" },
+        { "fieldPath": "fechaUltimoContacto", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "clientes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "servicioPendiente", "order": "ASCENDING" },
+        { "fieldPath": "fechaUltimoContacto", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "mensajes_log",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "jid", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "colaLena",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "estado", "order": "ASCENDING" },
+        { "fieldPath": "fechaPedido", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "entregas_agenda",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "fechaDia", "order": "ASCENDING" },
+        { "fieldPath": "estado", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "mensajes_programados",
       "queryScope": "COLLECTION",
       "fields": [
@@ -14,14 +62,6 @@
       "fields": [
         { "fieldPath": "estado", "order": "ASCENDING" },
         { "fieldPath": "creadoEn", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "entregas_agenda",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "fechaDia", "order": "ASCENDING" },
-        { "fieldPath": "estado", "order": "ASCENDING" }
       ]
     }
   ],
