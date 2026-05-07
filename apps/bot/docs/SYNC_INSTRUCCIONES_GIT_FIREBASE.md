@@ -49,6 +49,31 @@ Toda modificación de instrucciones, skills, precios, promociones o comportamien
 - Dashboard: interfaz humana para editar y verificar.
 - Bot: consumidor operativo que debe recargarse o redeployarse cuando la lectura no sea live.
 
+## Skills Vicky (`vicky_skills`)
+
+El bot **siempre prioriza** los documentos en Firestore (`vicky_skills/*`). Si la colección está vacía o falla la lectura, usa **fallback** desde `apps/bot/vicky-skills/*.md` según `vicky-skills/index.json`.
+
+**Flujo recomendado (equipo/dev, sin desalinear panel y Git):**
+
+1. Editar los `.md` en **`apps/bot/vicky-skills/`** (y `index.json` si se agrega o reordena una skill).
+2. Commit y push en Git.
+3. Subir el mismo contenido a Firebase (operativo + lo que ve el dashboard):
+   ```bash
+   cd apps/bot
+   npm run config:import
+   ```
+   El script también actualiza **`config/general.recargarBotAt`** para que el bot recargue el system prompt (incluye skills) en el **poll de runtime (~60 s)** sin redeploy obligatorio.
+4. Opcional pero recomendable: refrescar el snapshot versionado:
+   ```bash
+   npm run config:export
+   ```
+   y commitear `config-snapshots/vicky-runtime-config.json`.
+5. **Redeploy de `vicky-bot`** solo si necesitás alinear **código** nuevo o forzar arranque limpio en todas las revisiones; para skills/prompt vía Firestore alcanza con el paso 3.
+
+**Si alguien editó solo desde el panel:** Firestore quedó distinto de Git. Para alinear, copiar el texto al `.md` correspondiente en el repo **o** volver a ejecutar `config:import` tras corregir Git para que Firestore refleje la versión acordada.
+
+**No** dejar solo el cambio en Git sin `config:import`: en producción Gemini seguirá leyendo Firestore y no verá el markdown nuevo hasta importar.
+
 ## Colecciones principales
 
 - `config/prompts`

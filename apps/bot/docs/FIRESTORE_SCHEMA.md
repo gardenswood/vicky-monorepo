@@ -211,12 +211,12 @@ Skills internas de Vicky versionadas en Git (`apps/bot/vicky-skills`) y editable
 | `activo` | bool | Si es `false`, el bot no la inyecta. |
 | `orden` | number | Orden de inyección en el system prompt. |
 | `archivo` | string opcional | Archivo fuente en Git. |
-| `origen` | string | `git`, `dashboard`, etc. |
+| `origen` | string | `git` (tras `npm run config:import`), `dashboard`, etc. |
 | `actualizadoEn` | Timestamp | Auditoría. |
 
 Subcolección `vicky_skills/{skillId}/versiones/{versionId}`: snapshots guardados por el dashboard antes de actualizar una skill.
 
-El bot lee `vicky_skills/*` al armar Gemini. Si Firestore no tiene skills, usa fallback local desde `apps/bot/vicky-skills/*.md`.
+El bot lee **`vicky_skills` en Firestore primero**. Si no hay documentos activos con contenido, usa fallback local desde `apps/bot/vicky-skills/*.md`. Tras cambiar skills en el repo, ejecutar **`npm run config:import`** en `apps/bot` para que Firebase y el panel queden alineados con Git (ver `docs/SYNC_INSTRUCCIONES_GIT_FIREBASE.md`).
 
 ### Asistente Vicky: `assistant_runs`, `assistant_changes`, `change_requests`
 

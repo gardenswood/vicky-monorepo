@@ -98,6 +98,18 @@ async function importConfig() {
 
     await batch.commit();
     console.log(`Skills importadas a Firebase: ${skills.map((s) => s.id).join(', ')}`);
+
+    // Sin esto, el bot puede seguir con el system prompt viejo en RAM hasta redeploy:
+    // el poll de runtime solo recarga si cambia config/general.recargarBotAt (u otros timestamps).
+    await db.collection('config').doc('general').set(
+        {
+            recargarBotAt: FieldValue.serverTimestamp(),
+            recargarBotMotivo: 'sync-vicky-config.js import (skills Git → Firestore)',
+            ultimaActualizacion: FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+    );
+    console.log('config/general.recargarBotAt actualizado → el bot recargará prompt/skills en el próximo poll (~60s).');
 }
 
 async function main() {

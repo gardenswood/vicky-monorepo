@@ -12,7 +12,7 @@ Este mapa define qué funciones humanas del dashboard tienen equivalente operati
 | `/agenda-entregas` | `entregas_agenda`, `mensajes_programados`, `datos_entrega_cliente`, `colaLena` | Crear/editar entregas y recordatorios | Emitir `[ENTREGA:...]`, `[AGENDAR:...]`, avisos al grupo |
 | `/cola-lena` | `colaLena`, `config/general` | Ver pedidos confirmados chicos | Sincronizar cola operativa y estados de despacho |
 | `/logistica-zonas` | `consultasLena`, `mensajes_programados`, `config/general` | Agrupar consultas por zona y enviar campañas | Usar interés pendiente por zona y programar WhatsApp |
-| `/config/prompts` | `config/prompts`, `vicky_skills` | Editar instrucciones y skills | Cargar prompt y skills al armar Gemini |
+| `/config/prompts` | `config/prompts`, `vicky_skills` | Editar instrucciones y skills | Cargar prompt y skills al armar Gemini. Skills versionadas en Git: tras editar `vicky-skills/*.md`, ejecutar `npm run config:import` en `apps/bot` para alinear Firestore y lo que muestra el panel |
 | `/config/promociones` | `config/promociones` | Promos y restricciones | Aplicar reglas comerciales vigentes |
 | `/config/precios` | `servicios/*` | Catálogo, precios y envío | Responder con precios reales y marcadores de catálogo |
 | `/config/general` | `config/general` | Delays, admin, cron, umbrales | Control runtime del bot y campañas |
