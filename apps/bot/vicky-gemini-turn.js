@@ -447,16 +447,22 @@ async function ejecutarTurnoVickyGeminiCore(deps, params) {
 
         const cotizMatch = respuesta.match(/\[COTIZACION:(lena|cerco|pergola|fogonero|bancos|madera)\]/i);
         const huboCotizacionMarcador = !!cotizMatch;
+        let cotizacionServicio = null;
         if (cotizMatch) {
             const srv = cotizMatch[1].toLowerCase();
+            cotizacionServicio = srv;
             respuesta = respuesta.replace(/\[COTIZACION:[^\]]+\]/gi, '').trim();
+            const clienteDicePospuso = /pienso|pensar|n[uú]meros|te avis[oó]|despu[eé]s|lo consulto|me lo pienso|recien|m[aá]s adelante/i.test(
+                String(text || '')
+            );
+            const horasProxCrm = clienteDicePospuso ? 72 : 48;
             actualizarEstadoCliente(remoteJid, {
                 estado: 'cotizacion_enviada',
                 servicioPendiente: srv,
                 potencial: 'caliente',
                 statusCrm: 'seguimiento',
                 urgencia: 'alta',
-                proximoContactoAt: fechaSeguimientoDesdeAhora(24),
+                proximoContactoAt: fechaSeguimientoDesdeAhora(horasProxCrm),
                 textoCotizacion: text,
                 fechaCotizacion: new Date().toISOString(),
                 seguimientoEnviado: false,
@@ -733,11 +739,13 @@ async function ejecutarTurnoVickyGeminiCore(deps, params) {
         }
 
         const seguimientoMatch = respuesta.match(/\[SEGUIMIENTO:([^\]]+)\]/i);
+        let seguimientoAgendadoOk = false;
         if (seguimientoMatch && firestoreModule.isAvailable()) {
             const partesSeg = seguimientoMatch[1].split('|').map((x) => x.trim());
             const horasSeg = parseInt(partesSeg[0], 10);
             const motivoSeg = (partesSeg[1] || '').slice(0, 200);
             if (Number.isFinite(horasSeg) && horasSeg > 0 && motivoSeg) {
+                seguimientoAgendadoOk = true;
                 const runMsSeg = Date.now() + horasSeg * 3600000;
                 const clienteSeg = getCliente(remoteJid);
                 const nombreSeg = clienteSeg?.nombre || '';
@@ -765,6 +773,54 @@ async function ejecutarTurnoVickyGeminiCore(deps, params) {
                 console.log(`📅 Seguimiento agendado ${remoteJid} en ${horasSeg}h: ${motivoSeg}`);
             }
             respuesta = respuesta.replace(/\[SEGUIMIENTO:[^\]]+\]/gi, '').trim();
+        }
+
+        if (
+            huboCotizacionMarcador &&
+            !seguimientoAgendadoOk &&
+            cotizacionServicio &&
+            firestoreModule.isAvailable()
+        ) {
+            const clienteDicePospusoFb = /pienso|pensar|n[uú]meros|te avis[oó]|despu[eé]s|lo consulto|me lo pienso|recien|m[aá]s adelante/i.test(
+                String(text || '')
+            );
+            const horasFallback = clienteDicePospusoFb ? 72 : 48;
+            const runMsFb = Date.now() + horasFallback * 3600000;
+            const cliFb = getCliente(remoteJid);
+            const primerNom = (cliFb?.nombre || '').trim().split(/\s+/)[0] || '';
+            const pub = SERVICIO_PUBLICO[cotizacionServicio] || 'el presupuesto';
+            const textoSegFb = primerNom
+                ? `Hola ${primerNom}, te escribo por lo que habíamos visto de ${pub} en Gardens Wood. ¿Pudiste definir o querés que ajustemos algo del presupuesto? 😊`
+                : `Hola, te escribo por lo que habíamos visto de ${pub} en Gardens Wood. ¿Pudiste definir o querés que ajustemos algo del presupuesto? 😊`;
+            await firestoreModule.addMensajeProgramado({
+                jid: remoteJid,
+                texto: textoSegFb,
+                runAtMs: runMsFb,
+                origen: 'vicky_cotizacion_fallback',
+                motivoSeguimiento: textoSegFb.slice(0, 200),
+                nombreCliente: primerNom,
+            });
+            actualizarEstadoCliente(remoteJid, {
+                proximoContactoAt: new Date(runMsFb),
+            });
+            const telFb = docIdClienteFirestore(remoteJid, cliFb);
+            if (telFb && typeof firestoreModule.addAccionCrm === 'function') {
+                firestoreModule
+                    .addAccionCrm({
+                        tel: telFb,
+                        tipo: 'seguimiento_agendado',
+                        datos: {
+                            horas: horasFallback,
+                            motivo: 'fallback_post_cotizacion_sin_marcador',
+                            runAt: new Date(runMsFb).toISOString(),
+                        },
+                        origen: 'vicky_auto',
+                    })
+                    .catch(() => {});
+            }
+            console.log(
+                `📅 Seguimiento automático post-cotización ${remoteJid} en ${horasFallback}h (sin [SEGUIMIENTO:] del modelo)`
+            );
         }
 
         const calificarMatch = respuesta.match(/\[CALIFICAR:([^\]]+)\]/i);

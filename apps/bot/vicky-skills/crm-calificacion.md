@@ -9,12 +9,14 @@ Calificar, seccionar y dar seguimiento a cada lead de forma automática durante 
 ### [CRM:potencial|statusCrm|urgencia|zona|intereses]
 Actualiza campos CRM del cliente. Usar siempre que aparezca información nueva.
 
-### [SEGUIMIENTO:horas|motivo]
-Agenda un seguimiento automático. `horas` = tiempo en horas desde ahora. `motivo` = texto breve visible en el dashboard (max 120 chars).
+### [SEGUIMIENTO:horas|texto_para_el_cliente]
+Agenda un **mensaje de WhatsApp** que el cliente recibe cuando vence la hora programada. `horas` = horas desde ahora. La segunda parte **es el texto que verá el cliente** (no una nota interna): tono Gardens Wood, breve, y que recuerde qué temas (cerco, leña, zona, presupuesto).
+
+Si el cliente dijo que **va a pensar**, hace **números** o **después avisa**: usá **48–72 h** (2–3 días). Tras `[COTIZACION:…]`, conviene siempre este marcador con texto personalizado; si no, el código puede mandar un mensaje genérico a 48/72 h.
+
 Ejemplos:
-- `[SEGUIMIENTO:24|Enviamos cotización cerco 12m, esperar respuesta]`
-- `[SEGUIMIENTO:48|Cliente pidió pensar precio leña 200kg]`
-- `[SEGUIMIENTO:72|Consulta tibio por pérgola, recontactar]`
+- `[SEGUIMIENTO:48|Hola, ¿pudiste ver el presupuesto del cerco que te pasé? Cualquier duda me escribís 😊]`
+- `[SEGUIMIENTO:72|Te escribo por la leña que estábamos viendo. ¿Definiste cuántos kg necesitás?]`
 
 ### [CALIFICAR:potencial|statusCrm|motivo]
 Calificación con motivo auditable que queda en el historial CRM del cliente.
@@ -65,7 +67,7 @@ Vicky DEBE actualizar el `statusCrm` según estos criterios:
 ```
 pendiente_cotizacion → seguimiento
   Cuando: se envió cotización, precio o presupuesto.
-  Acción: [SEGUIMIENTO:24|motivo] + [CALIFICAR:caliente|seguimiento|motivo]
+  Acción: [SEGUIMIENTO:48|texto al cliente recordando el tema] o 72h si pidió pensar; opcional [CALIFICAR:caliente|seguimiento|motivo auditoría]
 
 pendiente_cotizacion → pendiente_cotizacion
   Cuando: el cliente consulta pero faltan datos para cotizar.
@@ -92,10 +94,10 @@ cualquier estado → perdido
 
 Vicky DEBE agendar seguimiento en estos escenarios:
 
-| Escenario | Horas | statusCrm |
-|-----------|-------|-----------|
-| Cotización enviada, cliente no confirmó | 24 | seguimiento |
-| Cliente pidió "lo pienso" o "después te aviso" | 48 | seguimiento |
+| Escenario | Horas (orientativo) | statusCrm |
+|-----------|---------------------|-----------|
+| Cotización enviada, cliente no confirmó | 48 | seguimiento |
+| Cliente pidió "lo pienso", números, "después te aviso" | 48–72 | seguimiento |
 | Consulta tibia sin datos para cotizar | 72 | pendiente_cotizacion |
 | Cliente no respondió al primer seguimiento | 48 | seguimiento |
 | Presupuesto aceptado, esperando seña/pago | 12 | concreto |
@@ -136,7 +138,7 @@ En cada interacción, Vicky debe capturar y actualizar los datos CRM disponibles
 
 ## Integración con otros marcadores
 
-- Si se usa [COTIZACION:srv]: automáticamente agendar [SEGUIMIENTO:24|Cotización {srv} enviada].
+- Si se usa [COTIZACION:srv]: agendar preferentemente `[SEGUIMIENTO:48|texto al cliente…]` (o 72h si pospuso). Si no ponés [SEGUIMIENTO:], el sistema agenda un mensaje estándar a 48/72h; mejor que lo armemos vos con contexto.
 - Si se usa [HANDOFF_EXPERTO:...]: NO agendar seguimiento (el humano toma el control).
 - Si se usa [CONFIRMADO]: cambiar a [CALIFICAR:caliente|concreto|Cliente confirmó].
 - Si se usa [PEDIDO:...]: NO necesita seguimiento (ya es venta cerrada).
