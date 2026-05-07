@@ -420,10 +420,11 @@ async function ejecutarTurnoVickyGeminiCore(deps, params) {
                 result = await chat.sendMessage(contenidoMensaje);
                 break;
             } catch (errApi) {
-                const es429 = errApi.message && errApi.message.includes('429');
-                if (es429 && intento < MAX_REINTENTOS - 1) {
+                const msg = errApi.message || '';
+                const esRetryable = msg.includes('429') || msg.includes('503') || msg.includes('500') || msg.includes('UNAVAILABLE') || msg.includes('high demand');
+                if (esRetryable && intento < MAX_REINTENTOS - 1) {
                     console.warn(
-                        `⚠️ Gemini 429, reintentando en ${ESPERAS[intento] / 1000}s... (intento ${intento + 1})`
+                        `⚠️ Gemini error transitorio, reintentando en ${ESPERAS[intento] / 1000}s... (intento ${intento + 1}/${MAX_REINTENTOS}) — ${msg.slice(0, 120)}`
                     );
                     await delay(ESPERAS[intento]);
                 } else {
